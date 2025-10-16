@@ -8,6 +8,9 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "main": ".open-next/worker.js",
   "name": "family-photo",
+  "observability": {
+    "enabled": true
+  },
   "r2_buckets": [
     {
       "binding": "NEXT_INC_CACHE_R2_BUCKET",
