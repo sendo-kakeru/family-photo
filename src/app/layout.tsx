@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Family Photo",
   description: "",
+  title: "Family Photo",
 };
 
 export default function RootLayout({
@@ -17,14 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body
-        className={cn(
-          "min-h-svh bg-white antialiased",
-          inter.variable,
-        )}
-      >
+      <body className={cn("min-h-svh bg-white antialiased", inter.variable)}>
         {/* TODO: 必要ならヘッダー設定。不要なら削除 */}
-        <header></header>
+        {/* <header></header> */}
         <main>{children}</main>
       </body>
     </html>
