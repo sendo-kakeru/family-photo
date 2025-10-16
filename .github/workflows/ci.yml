@@ -15,5 +15,8 @@ jobs:
       - name: Setup pnpm
         uses: ./.github/actions/setup-pnpm
 
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+
       - name: Run CI
-        run: pnpm run ci --concurrency=100%
+        run: pnpm run ci

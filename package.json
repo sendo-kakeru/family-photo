@@ -1,14 +1,4 @@
 {
-  "name": "family-photo",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "biome check",
-    "format": "biome format --write"
-  },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
@@ -31,7 +21,19 @@
     "typescript": "^5"
   },
   "engines": {
-		"node": ">=22"
-	},
-	"packageManager": "pnpm@10.17.0"
+    "node": ">=22"
+  },
+  "name": "family-photo",
+  "packageManager": "pnpm@10.17.0",
+  "private": true,
+  "scripts": {
+    "build": "next build --turbopack",
+    "ci": "biome ci && pnpm run typecheck",
+    "dev": "next dev --turbopack",
+    "format": "biome check --write",
+    "lint": "biome check",
+    "start": "next start",
+    "typecheck": "tsc"
+  },
+  "version": "0.1.0"
 }
