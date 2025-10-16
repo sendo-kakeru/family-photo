@@ -1,0 +1,44 @@
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: 'weekly'
+      day: 'sunday'
+    assignees:
+      - "sendo-kakeru"
+    open-pull-requests-limit: 20
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: "weekly"
+    assignees:
+      - "sendo-kakeru"
+    groups:
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+      next:
+        patterns:
+          - 'next'
+          - '@next/*'
+      radix-ui:
+        patterns:
+          - 'radix-ui'
+          - '@radix-ui/*'
+      tailwindcss:
+        patterns:
+          - tailwindcss
+          - '@tailwindcss/*'
+      vitest:
+        patterns:
+          - vitest
+          - '@vitest/*'
