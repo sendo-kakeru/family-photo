@@ -1,23 +1,36 @@
-- オブジェクトストレージ: Backblaze B2
-- DBなし
-- 認証:
-  - Auth.js(Google認証)
-  - 特定のGoogleアカウントのみ許可(2~6個のアカウント数想定)
-- フロント：
-  - Next.js
-  - Cloudflare Workers(OpenNext)
-  - tailwind css
-  - base ui
-  - 動画と画像のみで拡張子はできるだけ全て対応したい
-  - cfキャッシュを適切に活用
-  - 機能
-    - ギャラリー
-      - 無限スクロール
-      - 全部でx枚中、y枚部分へジャンプ機能
-      - 横4枚がベースで6枚にも変更可能
-      - ギャラリーでは正方形で表示
-    - 詳細
-      - 画像は一枚表示、動画は再生可能
-      - 削除、共有など、アクションは不要
-    - 一括アップロード
-      - 万単位の一括アップロードが予想される
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
