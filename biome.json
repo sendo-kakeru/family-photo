@@ -41,7 +41,7 @@
           "level": "warn",
           "options": {
             "attributes": ["classList"],
-            "functions": ["clsx", "tv"]
+            "functions": ["cn", "cva"]
           }
         }
       },
