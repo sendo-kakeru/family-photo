@@ -1,4 +1,4 @@
-import { auth, signIn, signOut } from "@/auth";
+import { auth, signIn } from "@/auth";
 import { GoogleSigninButton } from "@/components/GoogleSigninButton";
 
 export default async function Home({
@@ -12,15 +12,7 @@ export default async function Home({
   if (session?.user) {
     return (
       // TODO: ギャラリー
-      <form
-        action={async () => {
-          "use server";
-          await signOut();
-        }}
-      >
-        <p>Welcome to {session.user.name}</p>
-        <button type="submit">Sign Out</button>
-      </form>
+      <p>Welcome to {session.user.name}</p>
     );
   }
 
