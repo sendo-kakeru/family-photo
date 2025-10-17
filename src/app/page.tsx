@@ -1,4 +1,5 @@
 import { auth, signIn, signOut } from "@/auth";
+import { GoogleSigninButton } from "@/components/GoogleSigninButton";
 
 export default async function Home({
   searchParams,
@@ -10,6 +11,7 @@ export default async function Home({
 
   if (session?.user) {
     return (
+      // TODO: ギャラリー
       <form
         action={async () => {
           "use server";
@@ -28,9 +30,16 @@ export default async function Home({
         "use server";
         await signIn("google");
       }}
+      className="grid place-items-center gap-2"
     >
-      {error === "unauthorized" && <p>続行するにはログインしてください</p>}
-      <button type="submit">Signin with Google</button>
+      <div className="grid place-items-center gap-4">
+        {error === "unauthorized" && (
+          <p className="font-bold text-xl">続行するにはログインしてください</p>
+        )}
+        <GoogleSigninButton type="submit">
+          Signin with Google
+        </GoogleSigninButton>
+      </div>
     </form>
   );
 }

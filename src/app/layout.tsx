@@ -17,10 +17,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className={cn("min-h-svh bg-white antialiased", inter.variable)}>
+      <body
+        className={cn("min-h-svh grid bg-white antialiased", inter.variable)}
+      >
         {/* TODO: 必要ならヘッダー設定。不要なら削除 */}
         {/* <header></header> */}
-        <main>{children}</main>
+        <main className="grid">{children}</main>
       </body>
     </html>
   );
