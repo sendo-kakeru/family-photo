@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Header } from "@/components/Header";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -18,10 +19,12 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className={cn("min-h-svh grid bg-white antialiased", inter.variable)}
+        className={cn(
+          "relative mx-auto grid min-h-svh max-w-[1056px] bg-white px-4 antialiased",
+          inter.variable,
+        )}
       >
-        {/* TODO: 必要ならヘッダー設定。不要なら削除 */}
-        {/* <header></header> */}
+        <Header />
         <main className="grid">{children}</main>
       </body>
     </html>
