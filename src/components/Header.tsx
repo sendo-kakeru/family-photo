@@ -1,8 +1,14 @@
+import Link from "next/link";
 import { FaUser } from "react-icons/fa";
 import { auth, signOut } from "@/auth";
 import { Avatar, AvatarImage } from "./ui/avatar";
-import { Button } from "./ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 export async function Header() {
   const session = await auth();
@@ -18,9 +24,9 @@ export async function Header() {
         id="sign-out"
       >
         {session?.user && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button type="button">
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button className="rounded-full" type="button">
                 {session.user.image ? (
                   <Avatar className="size-8">
                     <AvatarImage src={session.user.image} />
@@ -29,18 +35,24 @@ export async function Header() {
                   <FaUser className="size-8" />
                 )}
               </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-fit">
-              <Button
-                className="font-bold"
-                form="sign-out"
-                type="submit"
-                variant="destructive"
-              >
-                ログアウト
-              </Button>
-            </PopoverContent>
-          </Popover>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-fit">
+              <DropdownMenuItem asChild>
+                <Link href="/upload">アップロード</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem asChild>
+                <button
+                  className="w-full font-bold text-red-500"
+                  form="sign-out"
+                  type="submit"
+                >
+                  ログアウト
+                </button>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </form>
     </header>

@@ -1,4 +1,5 @@
 import { auth, signIn } from "@/auth";
+import Gallery from "@/components/Gallery";
 import { GoogleSigninButton } from "@/components/GoogleSigninButton";
 
 export default async function Home({
@@ -10,10 +11,7 @@ export default async function Home({
   const session = await auth();
 
   if (session?.user) {
-    return (
-      // TODO: ギャラリー
-      <p>Welcome to {session.user.name}</p>
-    );
+    return <Gallery />;
   }
 
   return (
