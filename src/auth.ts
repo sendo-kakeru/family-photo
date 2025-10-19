@@ -1,12 +1,8 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 
-if (!process.env.ALLOW_EMAILS || !process.env.AUTH_SECRET) {
-  throw new Error("ALLOW_EMAILS and AUTH_SECRET must be set");
-}
-
 const ALLOW_EMAILS = new Set(
-  process.env.ALLOW_EMAILS.split(",")
+  process.env.ALLOW_EMAILS?.split(",")
     .map((split) => split.trim().toLowerCase())
     .filter(Boolean),
 );
