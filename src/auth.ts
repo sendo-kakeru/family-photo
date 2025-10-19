@@ -1,9 +1,9 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import { env } from "./lib/env";
 
 const ALLOW_EMAILS = new Set(
-  (process.env.ALLOW_EMAILS ?? "")
-    .split(",")
+  env.ALLOW_EMAILS.split(",")
     .map((split) => split.trim().toLowerCase())
     .filter(Boolean),
 );
@@ -18,6 +18,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
   providers: [Google],
-  secret: process.env.AUTH_SECRET,
+  secret: env.AUTH_SECRET,
   trustHost: true,
 });
