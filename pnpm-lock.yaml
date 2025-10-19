@@ -56,9 +56,6 @@ importers:
       valibot:
         specifier: ^1.1.0
         version: 1.1.0(typescript@5.9.3)
-      valibot-env:
-        specifier: ^1.0.0
-        version: 1.0.0(valibot@1.1.0(typescript@5.9.3))
     devDependencies:
       '@biomejs/biome':
         specifier: 2.2.6
@@ -2987,11 +2984,6 @@ packages:
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
     hasBin: true
-
-  valibot-env@1.0.0:
-    resolution: {integrity: sha512-1i9CYXOu4wYJScH/hO7m0mdn6CnJhktb6lGfj8xI20IOttkK6nH6NUS8TIDj0EU87Kd6SBbC9C6ktSM+sJV2Ig==}
-    peerDependencies:
-      valibot: ^1.0.0
 
   valibot@1.1.0:
     resolution: {integrity: sha512-Nk8lX30Qhu+9txPYTwM0cFlWLdPFsFr6LblzqIySfbZph9+BFsAHsNvHOymEviUepeIW6KFHzpX8TKhbptBXXw==}
@@ -6653,10 +6645,6 @@ snapshots:
   utils-merge@1.0.1: {}
 
   uuid@9.0.1: {}
-
-  valibot-env@1.0.0(valibot@1.1.0(typescript@5.9.3)):
-    dependencies:
-      valibot: 1.1.0(typescript@5.9.3)
 
   valibot@1.1.0(typescript@5.9.3):
     optionalDependencies:
