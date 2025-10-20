@@ -23,8 +23,6 @@ import type {
 const MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
 /** 署名URLを一度に発行する件数 */
 const PRESIGN_BATCH_SIZE = 200;
-/** 同時に走らせるPUTの最大数 */
-const MAX_CONCURRENT_PUTS = 5;
 
 type UploadTaskStatus = "idle" | "signing" | "uploading" | "done" | "error";
 
@@ -38,8 +36,8 @@ const STATUS_LABEL: Record<UploadTaskStatus, string> = {
 
 type UploadTask = {
   file: File;
-  objectKey: string | null; // S3/B2 上のキー
-  presignedUrl: string | null; // PUT用の署名URL
+  objectKey: string | null;
+  presignedUrl: string | null;
   progressPercent: number;
   status: UploadTaskStatus;
   errorMessage?: string;
@@ -83,120 +81,157 @@ export default function UploadPage() {
 
     const tasks = [...uploadTasks];
 
-    // presign → PUT をバッチで進行
+    // バッチごとに署名取得→アップロード処理
     for (
       let batchStart = 0;
       batchStart < tasks.length;
       batchStart += PRESIGN_BATCH_SIZE
     ) {
-      const batch = tasks.slice(batchStart, batchStart + PRESIGN_BATCH_SIZE);
+      const batchEnd = Math.min(batchStart + PRESIGN_BATCH_SIZE, tasks.length);
+      const batch = tasks.slice(batchStart, batchEnd);
 
-      // サイン状態に更新
-      batch.forEach((_, i) => {
-        const idx = batchStart + i;
-        tasks[idx] = { ...tasks[idx], progressPercent: 0, status: "signing" };
-      });
-      setUploadTasks([...tasks]);
-
-      // 署名URLの一括発行
-      const presignResponse = await fetch("/api/upload-signed-url", {
-        body: JSON.stringify(
-          batch.map((task) => ({
-            contentType: task.file.type || "application/octet-stream",
-            filename: task.file.name,
-            size: task.file.size,
-          })) satisfies UploadSignedUrlRequest,
-        ),
-        headers: { "content-type": "application/json" },
-        method: "POST",
-      });
-
-      if (!presignResponse.ok) {
-        batch.forEach((_, i) => {
-          const idx = batchStart + i;
-          tasks[idx] = {
-            ...tasks[idx],
-            errorMessage: `presign failed: ${presignResponse.status}`,
-            status: "error",
-          };
-        });
-        setUploadTasks([...tasks]);
-        continue;
+      // バッチ内のタスクを署名取得中に更新
+      for (let i = batchStart; i < batchEnd; i++) {
+        tasks[i] = { ...tasks[i], status: "signing" };
       }
-
-      const targets: UploadSignedUrlResponse = await presignResponse.json();
-
-      // 署名結果をタスクに反映
-      batch.forEach((_, i) => {
-        const idx = batchStart + i;
-        tasks[idx] = {
-          ...tasks[idx],
-          objectKey: targets[i]?.key ?? null,
-          presignedUrl: targets[i]?.url ?? null,
-        };
-      });
       setUploadTasks([...tasks]);
 
-      // PUT を並列実行
-      let nextInBatch = 0;
-      const uploadOne = async (localIndex: number) => {
-        const taskIndex = batchStart + localIndex;
-        const task = tasks[taskIndex];
-        if (!task || !task.presignedUrl) return;
+      try {
+        // バッチ分の署名URL取得
+        const presignResponse = await fetch("/api/upload-signed-url", {
+          body: JSON.stringify(
+            batch.map((task) => ({
+              contentType: task.file.type || "application/octet-stream",
+              filename: task.file.name,
+              size: task.file.size,
+            })) satisfies UploadSignedUrlRequest,
+          ),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        });
 
-        tasks[taskIndex] = { ...task, progressPercent: 0, status: "uploading" };
-        setUploadTasks([...tasks]);
-
-        try {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", task.presignedUrl, true);
-          xhr.setRequestHeader(
-            "Content-Type",
-            task.file.type || "application/octet-stream",
-          );
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const pct = Math.floor((e.loaded / e.total) * 100);
-              tasks[taskIndex] = { ...tasks[taskIndex], progressPercent: pct };
-              setUploadTasks([...tasks]);
-            }
-          };
-          await new Promise<void>((resolve, reject) => {
-            xhr.onload = () =>
-              xhr.status >= 200 && xhr.status < 300
-                ? resolve()
-                : reject(new Error(`PUT ${xhr.status}`));
-            xhr.onerror = () => reject(new Error("network error"));
-            xhr.send(task.file);
-          });
-
-          tasks[taskIndex] = {
-            ...tasks[taskIndex],
-            progressPercent: 100,
-            status: "done",
-          };
+        if (!presignResponse.ok) {
+          for (let i = batchStart; i < batchEnd; i++) {
+            tasks[i] = {
+              ...tasks[i],
+              errorMessage: `署名取得失敗: ${presignResponse.status}`,
+              status: "error",
+            };
+          }
           setUploadTasks([...tasks]);
-        } catch (error) {
-          console.error("Upload error:", error);
-          tasks[taskIndex] = {
-            ...tasks[taskIndex],
-            errorMessage: hasMessage(error)
-              ? error.message
-              : "ファイルのアップロードに失敗しました",
-            status: "error",
-          };
-          setUploadTasks([...tasks]);
+          continue;
         }
 
-        const pick = nextInBatch++;
-        if (pick < batch.length) await uploadOne(pick);
-      };
+        const signedUrls: UploadSignedUrlResponse =
+          await presignResponse.json();
 
-      const workers = Math.min(MAX_CONCURRENT_PUTS, batch.length);
-      nextInBatch = workers;
-      await Promise.all(
-        Array.from({ length: workers }, (_, i) => uploadOne(i)),
-      );
+        // 署名URLをタスクに設定
+        for (const [index, signedData] of signedUrls.entries()) {
+          const taskIndex = batchStart + index;
+          if (signedData) {
+            tasks[taskIndex] = {
+              ...tasks[taskIndex],
+              objectKey: signedData.key,
+              presignedUrl: signedData.url,
+              status: "idle",
+            };
+          } else {
+            tasks[taskIndex] = {
+              ...tasks[taskIndex],
+              errorMessage: "署名URLが取得できませんでした",
+              status: "error",
+            };
+          }
+        }
+        setUploadTasks([...tasks]);
+
+        // バッチ内を選択順に1つずつアップロード
+        for (let i = batchStart; i < batchEnd; i++) {
+          const task = tasks[i];
+          const presignedUrl = task.presignedUrl;
+
+          if (!presignedUrl) {
+            tasks[i] = {
+              ...tasks[i],
+              errorMessage: "署名URLがありません",
+              status: "error",
+            };
+            setUploadTasks([...tasks]);
+            continue;
+          }
+
+          // アップロード開始
+          tasks[i] = {
+            ...tasks[i],
+            progressPercent: 0,
+            status: "uploading",
+          };
+          setUploadTasks([...tasks]);
+
+          try {
+            // XMLHttpRequestでアップロード
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open("PUT", presignedUrl, true);
+              xhr.setRequestHeader(
+                "Content-Type",
+                task.file.type || "application/octet-stream",
+              );
+
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  const percent = Math.floor(
+                    (event.loaded / event.total) * 100,
+                  );
+                  tasks[i] = { ...tasks[i], progressPercent: percent };
+                  setUploadTasks([...tasks]);
+                }
+              };
+
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  tasks[i] = {
+                    ...tasks[i],
+                    progressPercent: 100,
+                    status: "done",
+                  };
+                  setUploadTasks([...tasks]);
+                  resolve();
+                } else {
+                  reject(new Error(`アップロード失敗: ${xhr.status}`));
+                }
+              };
+
+              xhr.onerror = () => reject(new Error("ネットワークエラー"));
+              xhr.send(task.file);
+            });
+          } catch (error) {
+            console.error("Upload error:", error);
+            tasks[i] = {
+              ...tasks[i],
+              errorMessage: hasMessage(error)
+                ? error.message
+                : "アップロード失敗",
+              status: "error",
+            };
+            setUploadTasks([...tasks]);
+          }
+        }
+      } catch (error) {
+        console.error("Batch error:", error);
+        for (let i = batchStart; i < batchEnd; i++) {
+          if (tasks[i].status === "signing") {
+            tasks[i] = {
+              ...tasks[i],
+              errorMessage: hasMessage(error)
+                ? error.message
+                : "バッチ処理エラー",
+              status: "error",
+            };
+          }
+        }
+        setUploadTasks([...tasks]);
+      }
     }
 
     setIsUploading(false);
@@ -226,12 +261,12 @@ export default function UploadPage() {
       </div>
 
       <ul className="grid gap-2">
-        {uploadTasks.map((task) => {
+        {uploadTasks.map((task, index) => {
           const isDone = task.status === "done";
           return (
             <li
               className="rounded border p-3"
-              key={(task.objectKey ?? task.file.name) + task.file.size}
+              key={`${index}-${task.file.name}`}
             >
               <div className="flex items-center gap-2 text-sm">
                 <FiCheckCircle
