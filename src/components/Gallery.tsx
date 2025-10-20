@@ -2,6 +2,7 @@
 
 import { ChevronDown, Loader2, Play } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +11,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 type MediaType = "image" | "video";
 
 type MediaItem = {
-  url: string; // 配信用URL（署名付き /assets/... を想定）
+  path: string; // 配信用パス（署名付き /assets/... を想定）
   size: number; // バイト数
   lastModified: string; // ISO文字列
-  contentType?: string; // 可能なら API で返す（例: "image/jpeg", "video/mp4"）
-  // 必要なら key なども追加
 };
 
 type MediasResponse = {
@@ -45,14 +44,9 @@ export default function Gallery() {
   }, []);
 
   const inferType = (item: MediaItem): MediaType => {
-    const contentType = item.contentType?.toLowerCase() ?? "";
-    if (contentType.startsWith("image/")) return "image";
-    if (contentType.startsWith("video/")) return "video";
-
-    // contentType が無い場合は拡張子で判定
-    const url = item.url.toLowerCase();
-    if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(url)) return "image";
-    if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(url)) return "video";
+    const path = item.path.toLowerCase();
+    if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(path)) return "image";
+    if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(path)) return "video";
     // 既定は画像扱い（必要に応じて変更）
     return "image";
   };
@@ -66,9 +60,9 @@ export default function Gallery() {
       if (continuationToken)
         searchParams.append("continuationToken", continuationToken);
 
-      const res = await fetch(`/api/medias?${searchParams.toString()}`);
-      if (!res.ok) throw new Error(`list failed: ${res.status}`);
-      const data: MediasResponse = await res.json();
+      const response = await fetch(`/api/medias?${searchParams.toString()}`);
+      if (!response.ok) throw new Error(`list failed: ${response.status}`);
+      const data: MediasResponse = await response.json();
 
       setMediaItems((prev) => [...prev, ...(data.medias ?? [])]);
       setContinuationToken(data.nextContinuationToken);
@@ -133,13 +127,6 @@ export default function Gallery() {
       setHasMore(more);
       setIsLoading(false);
     }
-
-    // スクロール
-    // setTimeout(() => {
-    //   const tiles = gridRef.current?.querySelectorAll(".media-tile");
-    //   const node = tiles?.[targetIdx];
-    //   node?.scrollIntoView({ behavior: "smooth", block: "center" });
-    // }, 100);
   };
 
   const gridColsClass =
@@ -212,19 +199,20 @@ export default function Gallery() {
       {/* ギャラリー */}
       <div className={`grid ${gridColsClass} gap-2 md:gap-4`} ref={gridRef}>
         {mediaItems.map((item, idx) => {
-          const kind = inferType(item);
+          const type = inferType(item);
           return (
-            <div
+            <Link
               className="media-tile relative aspect-square overflow-hidden rounded-md bg-gray-100"
-              key={item.url}
+              href={type === "video" ? `/watch${item.path}` : item.path}
+              key={item.path}
             >
-              {kind === "image" ? (
+              {type === "image" ? (
                 <Image
                   alt={`${idx + 1}`}
                   className="h-full w-full object-cover transition-transform hover:scale-105"
                   height={240}
                   loading="lazy"
-                  src={item.url}
+                  src={item.path}
                   unoptimized
                   width={240}
                 />
@@ -235,14 +223,14 @@ export default function Gallery() {
                     muted
                     playsInline
                     preload="metadata"
-                    src={item.url}
+                    src={item.path}
                   />
                   <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
                     <Play className="h-10 w-10 text-white drop-shadow" />
                   </div>
                 </div>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>

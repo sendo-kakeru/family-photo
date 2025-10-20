@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
     const medias = await Promise.all(
       items.map(async (item) => ({
         lastModified: item.LastModified,
+        path: `/assets/${item.Key}`,
         size: item.Size,
-        url: `/assets/${item.Key}`,
       })),
     );
 
