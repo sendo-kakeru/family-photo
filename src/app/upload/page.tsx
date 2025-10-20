@@ -176,11 +176,12 @@ export default function UploadPage() {
             status: "done",
           };
           setUploadTasks([...tasks]);
-        } catch (err) {
+        } catch (error) {
+          console.error("Upload error:", error);
           tasks[taskIndex] = {
             ...tasks[taskIndex],
-            errorMessage: hasMessage(err)
-              ? err.message
+            errorMessage: hasMessage(error)
+              ? error.message
               : "ファイルのアップロードに失敗しました",
             status: "error",
           };
