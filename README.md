@@ -18,12 +18,10 @@ Googleドライブの課金が高いので自前で安く済ませるアプリ�
   - Auth.js(Google認証)
   - 特定のGoogleアカウントのみ許可(2~6個のアカウント数想定)
 - フロント：
-  - Next.js
-  - Cloudflare Workers(OpenNext)
+  - Next.js(Vercel)
   - tailwind css
   - shadcn ui
   - 動画と画像のみで拡張子はできるだけ全て対応したい
-  - cfキャッシュを適切に活用
   - UI/UX
     - ギャラリー
       - 無限スクロール
