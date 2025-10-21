@@ -210,20 +210,22 @@ export default function Gallery() {
                 <Image
                   alt={`${idx + 1}`}
                   className="h-full w-full object-cover transition-transform hover:scale-105"
-                  height={240}
+                  height={504}
                   loading="lazy"
                   src={item.path}
                   unoptimized
-                  width={240}
+                  width={504}
                 />
               ) : (
                 <div className="relative h-full w-full">
                   <video
                     className="h-full w-full object-cover transition-transform hover:scale-105"
+                    height={504}
                     muted
                     playsInline
                     preload="metadata"
                     src={item.path}
+                    width={504}
                   />
                   <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
                     <Play className="h-10 w-10 text-white drop-shadow" />
