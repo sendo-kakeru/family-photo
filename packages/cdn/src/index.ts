@@ -64,13 +64,18 @@ function isListBucketRequest(env: Env, path: string): boolean {
 async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
   const env = c.env;
   const request = c.req.raw;
-  const url = new URL(request.url);
+  let requestUrl: URL;
 
-  url.protocol = HTTPS_PROTOCOL;
-  url.port = HTTPS_PORT;
+  try {
+    requestUrl = new URL(request.url);
+  } catch (error) {
+    console.error("Error in handleProxy:", error);
+    return c.text("Internal Server Error", 500);
+  }
 
-  // URLからパスを直接取得
-  const requestUrl = new URL(c.req.url);
+  requestUrl.protocol = HTTPS_PROTOCOL;
+  requestUrl.port = HTTPS_PORT;
+
   let path = requestUrl.pathname.substring(1); // 先頭の "/" を削除
   path = path.replace(/\/$/, ""); // 末尾の "/" を削除
 
@@ -85,13 +90,13 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
 
   switch (env.BUCKET_NAME) {
     case "$path":
-      url.hostname = env.B2_ENDPOINT;
+      requestUrl.hostname = env.B2_ENDPOINT;
       break;
     case "$host":
-      url.hostname = `${url.hostname.split(".")[0]}.${env.B2_ENDPOINT}`;
+      requestUrl.hostname = `${requestUrl.hostname.split(".")[0]}.${env.B2_ENDPOINT}`;
       break;
     default:
-      url.hostname = `${env.BUCKET_NAME}.${env.B2_ENDPOINT}`;
+      requestUrl.hostname = `${env.BUCKET_NAME}.${env.B2_ENDPOINT}`;
       break;
   }
 
@@ -105,13 +110,13 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
 
   if (rcloneDownload) {
     if (env.BUCKET_NAME === "$path") {
-      url.pathname = path.replace(/^file\//, "");
+      requestUrl.pathname = path.replace(/^file\//, "");
     } else {
-      url.pathname = path.replace(/^file\/[^/]+\//, "");
+      requestUrl.pathname = path.replace(/^file\/[^/]+\//, "");
     }
   }
 
-  const signedRequest = await client.sign(url.toString(), {
+  const signedRequest = await client.sign(requestUrl.toString(), {
     headers: headers,
     method: "GET",
   });
@@ -173,12 +178,16 @@ app.use("*", async (c, next) => {
   const corsMiddleware = cors({
     allowHeaders: ["*"],
     allowMethods: ["GET", "HEAD"],
-    origin: `https://${c.env.APP_HOST}`,
+    origin: [`https://${c.env.APP_HOST}`, "http://localhost:3000"],
   });
   const ALLOW_HOSTS = new Set<string>([c.env.APP_HOST, "localhost"]);
-  const hostname = new URL(
-    c.req.header("Referer") ?? "",
-  ).hostname.toLowerCase();
+  let hostname: string;
+  try {
+    hostname = new URL(c.req.header("Referer") ?? "").hostname.toLowerCase();
+  } catch (error) {
+    console.error("Invalid Referer header:", c.req.header("Referer"), error);
+    return c.text("Bad Request", 400);
+  }
   if (!ALLOW_HOSTS.has(hostname)) {
     return c.text("Bad Request", 400);
   }
