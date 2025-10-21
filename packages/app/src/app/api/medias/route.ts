@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
     // 各ファイルに署名付きURLを生成
     const medias = await Promise.all(
       items.map(async (item) => ({
+        key: `${item.Key}`,
         lastModified: item.LastModified,
-        path: `/assets/${item.Key}`,
         size: item.Size,
       })),
     );

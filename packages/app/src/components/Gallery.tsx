@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 type MediaType = "image" | "video";
 
 type MediaItem = {
-  path: string; // 配信用パス（署名付き /assets/... を想定）
+  key: string; // 配信用パス（署名付き /assets/... を想定）
   size: number; // バイト数
   lastModified: string; // ISO文字列
 };
@@ -44,9 +44,9 @@ export default function Gallery() {
   }, []);
 
   const inferType = (item: MediaItem): MediaType => {
-    const path = item.path.toLowerCase();
-    if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(path)) return "image";
-    if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(path)) return "video";
+    const key = item.key.toLowerCase();
+    if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(key)) return "image";
+    if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(key)) return "video";
     // 既定は画像扱い（必要に応じて変更）
     return "image";
   };
@@ -200,11 +200,12 @@ export default function Gallery() {
       <div className={`grid ${gridColsClass} gap-2 md:gap-4`} ref={gridRef}>
         {mediaItems.map((item, idx) => {
           const type = inferType(item);
+          const mediaUrl = `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`;
           return (
             <Link
               className="media-tile relative aspect-square overflow-hidden rounded-md bg-gray-100"
-              href={type === "video" ? `/watch${item.path}` : item.path}
-              key={item.path}
+              href={type === "video" ? `/watch/${item.key}` : mediaUrl}
+              key={item.key}
             >
               {type === "image" ? (
                 <Image
@@ -212,7 +213,7 @@ export default function Gallery() {
                   className="h-full w-full object-cover transition-transform hover:scale-105"
                   height={504}
                   loading="lazy"
-                  src={item.path}
+                  src={mediaUrl}
                   unoptimized
                   width={504}
                 />
@@ -224,7 +225,7 @@ export default function Gallery() {
                     muted
                     playsInline
                     preload="metadata"
-                    src={item.path}
+                    src={mediaUrl}
                     width={504}
                   />
                   <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">

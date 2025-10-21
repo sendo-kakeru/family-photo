@@ -1,0 +1,19 @@
+{
+  "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.10.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.4.0"
+  },
+  "name": "@repo/cdn",
+  "scripts": {
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "deploy": "wrangler deploy --minify",
+    "dev": "wrangler dev",
+    "format": "biome check --fix --unsafe .",
+    "lint": "biome check",
+    "typecheck": "pnpm run cf-typegen && tsc --noEmit"
+  },
+  "type": "module"
+}
