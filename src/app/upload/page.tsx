@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { FiCheckCircle } from "react-icons/fi";
+import { MdHome } from "react-icons/md";
 import {
   instance,
   maxValue,
@@ -245,9 +247,17 @@ export default function UploadPage() {
   return (
     <main className="grid h-fit gap-8 pt-10">
       <div className="grid gap-y-4">
-        <p className="text-gray-600 text-sm">
-          {completedCount}/{uploadTasks.length} 完了
-        </p>
+        <div className="flex items-center gap-x-4">
+          <Button asChild variant="outline">
+            <Link href="/">
+              <MdHome className="size-4" />
+              ホームへ戻る
+            </Link>
+          </Button>
+          <p className="text-gray-600 text-sm">
+            {completedCount}/{uploadTasks.length} 完了
+          </p>
+        </div>
         <div>
           <Input multiple onChange={handleFileSelection} type="file" />
         </div>
