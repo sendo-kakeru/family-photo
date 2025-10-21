@@ -1,257 +1,274 @@
 "use client";
 
-import { ChevronDown, Loader2, Play } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Loader2, Play } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import useSWR from "swr";
+import useSWRInfinite from "swr/infinite";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 type MediaType = "image" | "video";
 
 type MediaItem = {
-  key: string; // 配信用パス（署名付き /assets/... を想定）
+  key: string; // 配信用パス
   size: number; // バイト数
   lastModified: string; // ISO文字列
 };
 
 type MediasResponse = {
   medias: MediaItem[]; // 一覧
-  nextContinuationToken: string | null; // 次ページトークン
+  nextPage: number | null; // 次ページ番号
   isTruncated: boolean; // まだ続きがあるか
+  keyCount: number; // 現在のページのアイテム数
 };
 
-export default function Gallery() {
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [continuationToken, setContinuationToken] = useState<string | null>(
-    null,
-  );
-  const [isColsOpen, setIsColsOpen] = useState(false);
-  const [columns, setColumns] = useState<2 | 4 | 6 | 8>(4);
-  const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [jumpToIndex, setJumpToIndex] = useState("");
-  const observerTargetRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-  useEffect(() => {
-    fetch("/api/medias/count")
-      .then((res) => res.json())
-      .then((data) => setTotalCount(data.count))
-      .catch(console.error);
-  }, []);
+export default function Gallery() {
+  const observerTargetRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState<2 | 3 | 4 | 5 | 6>(4);
+  const [isColsOpen, setIsColsOpen] = useState(false);
+  const [showScrollButtons, setShowScrollButtons] = useState(false);
+
+  const { data: totalCount } = useSWR<{ count: number }>(
+    "/api/medias/count",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    },
+  );
+
+  // SWR Infinite for pagination
+  const getKey = (
+    pageIndex: number,
+    previousPageData: MediasResponse | null,
+  ) => {
+    if (previousPageData && !previousPageData.isTruncated) return null;
+
+    const params = new URLSearchParams({
+      maxKeys: "500",
+      page: pageIndex.toString(),
+    });
+
+    return `/api/medias?${params.toString()}`;
+  };
+
+  const { data, error, size, setSize } = useSWRInfinite<MediasResponse>(
+    getKey,
+    fetcher,
+    {
+      revalidateAll: false,
+      revalidateFirstPage: false,
+    },
+  );
+
+  const medias = data ? data.flatMap((page) => page.medias ?? []) : [];
+  const isLoadingInitialData = !data && !error;
+  const isLoadingMore =
+    isLoadingInitialData ||
+    (size > 0 && data && typeof data[size - 1] === "undefined");
+  const isEmpty = data?.[0]?.medias?.length === 0;
+  const isReachingEnd =
+    isEmpty || (data && !data[data.length - 1]?.isTruncated);
 
   const inferType = (item: MediaItem): MediaType => {
     const key = item.key.toLowerCase();
     if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(key)) return "image";
     if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(key)) return "video";
-    // 既定は画像扱い（必要に応じて変更）
     return "image";
   };
 
-  const loadNextPage = useCallback(async () => {
-    if (isLoading || !hasMore) return;
-
-    setIsLoading(true);
-    try {
-      const searchParams = new URLSearchParams({ maxKeys: "50" });
-      if (continuationToken)
-        searchParams.append("continuationToken", continuationToken);
-
-      const response = await fetch(`/api/medias?${searchParams.toString()}`);
-      if (!response.ok) throw new Error(`list failed: ${response.status}`);
-      const data: MediasResponse = await response.json();
-
-      setMediaItems((prev) => [...prev, ...(data.medias ?? [])]);
-      setContinuationToken(data.nextContinuationToken);
-      setHasMore(Boolean(data.isTruncated));
-    } catch (error) {
-      console.error("Error loading medias:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [continuationToken, hasMore, isLoading]);
-
-  // 無限スクロール
+  // Infinite scroll
   useEffect(() => {
     const element = observerTargetRef.current;
     if (!element) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) void loadNextPage();
+        if (entries[0]?.isIntersecting && !isLoadingMore && !isReachingEnd) {
+          void setSize(size + 1);
+        }
       },
       { threshold: 0.1 },
     );
 
     observer.observe(element);
     return () => observer.disconnect();
-  }, [loadNextPage]);
+  }, [isLoadingMore, isReachingEnd, setSize, size]);
 
-  // 指定インデックスへジャンプ
-  const handleJump = async () => {
-    const index = Number.parseInt(jumpToIndex, 10);
-    if (Number.isNaN(index) || index < 1 || (totalCount && index > totalCount))
-      return;
+  // スクロール位置を監視してボタンの表示/非表示を制御
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollButtons(window.scrollY > 200);
+    };
 
-    const targetIdx = index - 1;
-    const preloadCount = targetIdx + columns * 2; // 余裕を持って読み込み
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-    if (mediaItems.length < preloadCount && hasMore) {
-      setIsLoading(true);
-      let token = continuationToken;
-      let list = [...mediaItems];
-      let more: boolean = hasMore;
-
-      while (list.length < preloadCount && more) {
-        const params = new URLSearchParams({ maxKeys: "50" });
-        if (token) params.append("continuationToken", token);
-
-        try {
-          const response = await fetch(`/api/medias?${params}`);
-          if (!response.ok) break;
-          const data: MediasResponse = await response.json();
-          list = [...list, ...(data.medias ?? [])];
-          token = data.nextContinuationToken;
-          more = Boolean(data.isTruncated);
-        } catch (error) {
-          console.error(error);
-          break;
-        }
-      }
-
-      setMediaItems(list);
-      setContinuationToken(token);
-      setHasMore(more);
-      setIsLoading(false);
-    }
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   };
 
-  const gridColsClass =
-    columns === 2
-      ? "grid-cols-2"
-      : columns === 4
-        ? "grid-cols-4"
-        : columns === 6
-          ? "grid-cols-6"
-          : "grid-cols-8";
+  const scrollToTop = () => {
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const gridColsClass = {
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+    5: "grid-cols-5",
+    6: "grid-cols-6",
+  }[columns];
 
   return (
-    <div>
-      <div className="mb-6 grid gap-4 py-4">
+    <>
+      {/* トップアンカー */}
+      <div ref={topRef} />
+      <div className="flex items-center justify-between py-4">
         {/* カウンター */}
-        {totalCount !== null && (
-          <div className="text-gray-600 text-sm">
-            全{totalCount}件中 {mediaItems.length}件表示
-          </div>
-        )}
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {/* 列数切替 */}
-          <Popover onOpenChange={setIsColsOpen} open={isColsOpen}>
-            <PopoverTrigger asChild>
-              <Button className="w-32" variant="outline">
-                {columns}列
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-
-            <PopoverContent align="start" className="w-32 p-2">
-              <div className="grid gap-2">
-                {([2, 4, 6, 8] as const).map((col) => (
-                  <Button
-                    className="w-full justify-center"
-                    key={col}
-                    onClick={() => {
-                      setColumns(col);
-                      setIsColsOpen(false); // 選択後に閉じる
-                    }}
-                    size="sm"
-                    variant={columns === col ? "default" : "outline"}
-                  >
-                    {col}列
-                  </Button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {/* ジャンプ */}
-          <div className="flex items-center gap-2">
-            <Input
-              className="w-28"
-              max={totalCount ?? undefined}
-              min={1}
-              onChange={(e) => setJumpToIndex(e.target.value)}
-              placeholder="番号"
-              type="number"
-              value={jumpToIndex}
-            />
-            <Button disabled={!jumpToIndex} onClick={handleJump}>
-              枚目へ
-            </Button>
-          </div>
+        <div className="text-gray-600 text-sm">
+          {totalCount?.count && (
+            <>
+              全{totalCount.count}件中 {medias.length}件表示
+              {isReachingEnd && " (全て読み込み済み)"}
+            </>
+          )}
         </div>
+
+        {/* 列数切替 */}
+        <Popover onOpenChange={setIsColsOpen} open={isColsOpen}>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="outline">
+              {columns}列
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-32 p-2">
+            <div className="grid gap-2">
+              {([2, 3, 4, 5, 6] as const).map((col) => (
+                <Button
+                  className="w-full justify-center"
+                  key={col}
+                  onClick={() => {
+                    setColumns(col);
+                    setIsColsOpen(false);
+                  }}
+                  size="sm"
+                  variant={columns === col ? "default" : "outline"}
+                >
+                  {col}列
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* ギャラリー */}
-      <div className={`grid ${gridColsClass} gap-2 md:gap-4`} ref={gridRef}>
-        {mediaItems.map((item, idx) => {
+      <div className={`grid ${gridColsClass} gap-2`}>
+        {medias.map((item, index) => {
           const type = inferType(item);
           const mediaUrl = `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`;
+
           return (
-            <Link
-              className="media-tile relative aspect-square overflow-hidden rounded-md bg-gray-100"
-              href={type === "video" ? `/watch/${item.key}` : mediaUrl}
-              key={item.key}
-            >
-              {type === "image" ? (
-                <Image
-                  alt={`${idx + 1}`}
-                  className="h-full w-full object-cover transition-transform hover:scale-105"
-                  height={504}
-                  loading="lazy"
-                  src={mediaUrl}
-                  unoptimized
-                  width={504}
-                />
-              ) : (
-                <div className="relative h-full w-full">
-                  <video
-                    className="h-full w-full object-cover transition-transform hover:scale-105"
+            <div className="group relative" key={item.key}>
+              <Link
+                className="media-tile relative block aspect-square overflow-hidden rounded-md bg-gray-100"
+                href={type === "video" ? `/watch/${item.key}` : mediaUrl}
+              >
+                {type === "image" ? (
+                  <Image
+                    alt={`${index + 1}`}
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
                     height={504}
-                    muted
-                    playsInline
-                    preload="metadata"
+                    loading="lazy"
                     src={mediaUrl}
+                    unoptimized
                     width={504}
                   />
-                  <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
-                    <Play className="h-10 w-10 text-white drop-shadow" />
+                ) : (
+                  <div className="relative h-full w-full">
+                    <video
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      height={504}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      src={mediaUrl}
+                      width={504}
+                    />
+                    <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
+                      <Play className="h-10 w-10 text-white drop-shadow" />
+                    </div>
                   </div>
-                </div>
-              )}
-            </Link>
+                )}
+              </Link>
+            </div>
           );
         })}
       </div>
 
-      {/* 無限スクロールトリガ */}
-      {hasMore && (
+      {/* Loading状態と無限スクロールトリガー */}
+      {(isLoadingInitialData || !isReachingEnd) && (
         <div className="mt-8 flex justify-center py-4" ref={observerTargetRef}>
-          {isLoading && (
+          {(isLoadingInitialData || isLoadingMore) && (
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           )}
         </div>
       )}
 
-      {!hasMore && mediaItems.length > 0 && (
+      {/* 全て読み込み済み */}
+      {isReachingEnd && medias.length > 0 && (
         <div className="mt-8 text-center text-gray-500">
           すべてのメディアを表示しました
         </div>
       )}
-    </div>
+
+      {/* エラー表示 */}
+      {error && (
+        <div className="mt-8 text-center text-red-500">
+          エラーが発生しました。ページを更新してください。
+        </div>
+      )}
+
+      {/* スクロール用のアンカー */}
+      <div ref={bottomRef} />
+
+      {/* 固定位置のスクロールボタン */}
+      {medias.length > 0 && showScrollButtons && (
+        <>
+          {/* トップへスクロール */}
+          <Button
+            className="fixed right-6 bottom-20 z-50 rounded-full shadow-lg"
+            onClick={scrollToTop}
+            size="icon"
+            variant="outline"
+          >
+            <ArrowUp className="h-5 w-5" />
+          </Button>
+
+          {/* ボトムへスクロール */}
+          <Button
+            className="fixed right-6 bottom-6 z-50 rounded-full shadow-lg"
+            onClick={scrollToBottom}
+            size="icon"
+            variant="outline"
+          >
+            <ArrowDown className="h-5 w-5" />
+          </Button>
+        </>
+      )}
+    </>
   );
 }
