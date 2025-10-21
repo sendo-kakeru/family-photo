@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import { decode, encode } from "next-auth/jwt";
 import Google from "next-auth/providers/google";
 
 const ALLOW_EMAILS = new Set(
@@ -14,6 +15,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return "/forbidden";
       }
       return true;
+    },
+  },
+  jwt: {
+    decode: async ({ token, secret }) => {
+      return decode({
+        salt: process.env.AUTH_SALT ?? "default-salt",
+        secret,
+        token,
+      });
+    },
+    encode: async ({ token, secret }) => {
+      return encode({
+        salt: process.env.AUTH_SALT ?? "default-salt",
+        secret,
+        token,
+      });
     },
   },
   providers: [Google],

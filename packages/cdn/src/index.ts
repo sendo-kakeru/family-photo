@@ -1,5 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
+import { getCookie } from "hono/cookie";
+import { decode } from "next-auth/jwt";
 
 type Env = {
   BUCKET_NAME: string;
@@ -8,7 +10,9 @@ type Env = {
   B2_APPLICATION_KEY: string;
   ALLOW_LIST_BUCKET?: string;
   RCLONE_DOWNLOAD?: string;
-  ALLOWED_HEADERS?: string[];
+  AUTH_SECRET: string;
+  AUTH_SALT: string;
+  ALLOW_EMAILS: string;
 };
 
 type HonoEnv = { Bindings: Env };
@@ -24,23 +28,26 @@ const UNSIGNABLE_HEADERS = [
   "if-none-match",
   "if-range",
   "if-unmodified-since",
-];
+] as const;
 
 const HTTPS_PROTOCOL = "https:";
 const HTTPS_PORT = "443";
 const RANGE_RETRY_ATTEMPTS = 3;
 
-function filterHeaders(headers: Headers, env: Env): Headers {
-  return new Headers(
-    Array.from(headers.entries()).filter(
-      ([key]) =>
-        !(
-          UNSIGNABLE_HEADERS.includes(key) ||
-          key.startsWith("cf-") ||
-          (env.ALLOWED_HEADERS && !env.ALLOWED_HEADERS.includes(key))
-        ),
-    ),
-  );
+function filterHeaders(headers: Headers): Headers {
+  const filteredHeaders = new Headers();
+  headers.forEach((value, key) => {
+    if (
+      !UNSIGNABLE_HEADERS.includes(
+        key as (typeof UNSIGNABLE_HEADERS)[number],
+      ) &&
+      !key.startsWith("cf-")
+    ) {
+      filteredHeaders.set(key, value);
+    }
+  });
+
+  return filteredHeaders;
 }
 
 function createHeadResponse(response: Response): Response {
@@ -63,6 +70,26 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
   const env = c.env;
   const request = c.req.raw;
   const url = new URL(request.url);
+  const ALLOW_EMAILS = new Set(
+    c.env.ALLOW_EMAILS?.split(",")
+      .map((split) => split.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const token = getCookie(c, "authjs.session-token");
+
+  if (!token) return c.text("Unauthorized", 401);
+
+  try {
+    const decodedToken = await decode({
+      salt: env.AUTH_SALT,
+      secret: env.AUTH_SECRET,
+      token,
+    });
+    if (ALLOW_EMAILS.has(decodedToken?.email?.toLowerCase() ?? ""))
+      throw new Error("Forbidden");
+  } catch {
+    return c.text("Forbidden", 403);
+  }
 
   url.protocol = HTTPS_PROTOCOL;
   url.port = HTTPS_PORT;
@@ -93,7 +120,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
       break;
   }
 
-  const headers = filterHeaders(request.headers, env);
+  const headers = filterHeaders(request.headers);
 
   const client = new AwsClient({
     accessKeyId: env.B2_APPLICATION_KEY_ID,
