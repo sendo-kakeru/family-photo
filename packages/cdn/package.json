@@ -1,19 +1,19 @@
 {
-  "author": "Pat Patterson <pat@backblaze.com>",
   "dependencies": {
     "aws4fetch": "^1.0.20",
-    "wrangler": "^3.80.1"
+    "hono": "^4.10.1"
   },
-  "description": "Provide access to a private Backblaze B2 bucket via a Cloudflare Worker",
-  "devDependencies": {},
-  "license": "MIT",
-  "main": "index.js",
+  "devDependencies": {
+    "wrangler": "^4.4.0"
+  },
   "name": "@repo/cdn",
-  "private": true,
   "scripts": {
-    "deploy": "wrangler publish",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "deploy": "wrangler deploy --minify",
+    "dev": "wrangler dev",
     "format": "biome check --fix --unsafe .",
-    "lint": "biome check"
+    "lint": "biome check",
+    "typecheck": "pnpm run cf-typegen && tsc --noEmit"
   },
-  "version": "1.2.0"
+  "type": "module"
 }

@@ -21,7 +21,6 @@ Googleドライブの課金が高いので自前で安く済ませるアプリ�
   - Next.js(Vercel)
   - tailwind css
   - shadcn ui
-  - 動画と画像のみで拡張子はできるだけ全て対応したい
   - UI/UX
     - ギャラリー
       - 無限スクロール
