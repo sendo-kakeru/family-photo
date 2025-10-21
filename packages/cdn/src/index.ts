@@ -175,7 +175,7 @@ app.use("*", async (c, next) => {
     allowMethods: ["GET", "HEAD"],
     origin: `https://${c.env.APP_HOST}`,
   });
-  const ALLOW_HOSTS = new Set<string>([c.env.APP_HOST]);
+  const ALLOW_HOSTS = new Set<string>([c.env.APP_HOST, "localhost"]);
   const hostname = new URL(
     c.req.header("Referer") ?? "",
   ).hostname.toLowerCase();
