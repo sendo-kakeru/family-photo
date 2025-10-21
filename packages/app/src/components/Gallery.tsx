@@ -135,21 +135,11 @@ export default function Gallery() {
     <>
       {/* トップアンカー */}
       <div ref={topRef} />
-      <div className="flex items-center justify-between py-4">
-        {/* カウンター */}
-        <div className="text-gray-600 text-sm">
-          {totalCount?.count && (
-            <>
-              全{totalCount.count}件中 {medias.length}件表示
-              {isReachingEnd && " (全て読み込み済み)"}
-            </>
-          )}
-        </div>
-
+      <div className="grid justify-between gap-y-4 py-4">
         {/* 列数切替 */}
         <Popover onOpenChange={setIsColsOpen} open={isColsOpen}>
           <PopoverTrigger asChild>
-            <Button size="sm" variant="outline">
+            <Button className="w-fit" size="sm" variant="outline">
               {columns}列
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
@@ -173,6 +163,16 @@ export default function Gallery() {
             </div>
           </PopoverContent>
         </Popover>
+
+        {/* カウンター */}
+        <div className="text-gray-600 text-sm">
+          {totalCount?.count && (
+            <>
+              全{totalCount.count}件中 {medias.length}件表示
+              {isReachingEnd && " (全て読み込み済み)"}
+            </>
+          )}
+        </div>
       </div>
 
       {/* ギャラリー */}
