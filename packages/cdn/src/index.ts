@@ -1,5 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
+import { cors } from "hono/cors";
 
 type Env = {
   BUCKET_NAME: string;
@@ -9,6 +10,7 @@ type Env = {
   ALLOW_LIST_BUCKET?: string;
   RCLONE_DOWNLOAD?: string;
   ALLOWED_HEADERS?: string[];
+  APP_HOST: string;
 };
 
 type HonoEnv = { Bindings: Env };
@@ -167,7 +169,21 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
 
   return fetchPromise;
 }
-
+app.use("*", async (c, next) => {
+  const corsMiddleware = cors({
+    allowHeaders: ["*"],
+    allowMethods: ["GET", "HEAD"],
+    origin: `https://${c.env.APP_HOST}`,
+  });
+  const ALLOW_HOSTS = new Set<string>([c.env.APP_HOST]);
+  const hostname = new URL(
+    c.req.header("Referer") ?? "",
+  ).hostname.toLowerCase();
+  if (!ALLOW_HOSTS.has(hostname)) {
+    return c.text("Bad Request", 400);
+  }
+  return corsMiddleware(c, next);
+});
 app.get("*", (c) => handleProxy(c, "GET"));
 app.on("HEAD", "*", (c) => handleProxy(c, "HEAD"));
 
