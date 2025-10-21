@@ -14,7 +14,7 @@ export async function Header() {
   const session = await auth();
 
   return (
-    <header className="absolute top-0 right-0 left-0 z-50 w-full bg-transparent px-4 pt-4">
+    <header className="h-fit w-full">
       <form
         action={async () => {
           "use server";

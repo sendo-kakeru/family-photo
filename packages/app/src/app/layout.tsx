@@ -20,12 +20,12 @@ export default function RootLayout({
     <html lang="ja">
       <body
         className={cn(
-          "relative mx-auto grid min-h-svh max-w-[1056px] bg-white px-4 antialiased",
+          "mx-auto min-h-svh max-w-[1056px] bg-white px-4 pt-4 antialiased",
           inter.variable,
         )}
       >
         <Header />
-        <main className="grid">{children}</main>
+        <main className="grid h-full">{children}</main>
       </body>
     </html>
   );
