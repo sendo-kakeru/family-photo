@@ -13,10 +13,14 @@ Googleドライブの課金が高いので自前で安く済ませるアプリ�
 
 ## 概要
 - オブジェクトストレージ: Backblaze B2
+  - Backblaze B2 → cloudflare 配信は無料
 - DBなし
 - 認証:
   - Auth.js(Google認証)
   - 特定のGoogleアカウントのみ許可(2~6個のアカウント数想定)
+- CDN:
+  - Hono(cloudflare workers)
+  - 配信のみ
 - フロント：
   - Next.js(Vercel)
   - tailwind css
