@@ -186,9 +186,10 @@ app.use("*", async (c, next) => {
 
   // 直アクセスをブロック（Refererヘッダーがない場合）
   if (!referer) {
-    // Next.jsの画像最適化プロキシは例外的に許可
-    // User-AgentがNext.jsを含む、またはNode.jsベースのリクエストを許可
+    // Next.jsの画像最適化プロキシを識別
     const isNextImageOptimization =
+      userAgent === "vercel-image-optimization/1.0" ||
+      userAgent.includes("vercel-image-optimization") ||
       userAgent.includes("Next.js") ||
       userAgent.includes("Node.js") ||
       userAgent.includes("undici") || // Next.jsが使用するHTTPクライアント
