@@ -180,17 +180,49 @@ app.use("*", async (c, next) => {
     allowMethods: ["GET", "HEAD"],
     origin: [`https://${c.env.APP_HOST}`, "http://localhost:3000"],
   });
-  const ALLOW_HOSTS = new Set<string>([c.env.APP_HOST, "localhost"]);
-  let hostname: string;
-  try {
-    hostname = new URL(c.req.header("Referer") ?? "").hostname.toLowerCase();
-  } catch (error) {
-    console.error("Invalid Referer header:", c.req.header("Referer"), error);
-    return c.text("Bad Request", 400);
+
+  const referer = c.req.header("Referer");
+  const userAgent = c.req.header("User-Agent") || "";
+
+  // 直アクセスをブロック（Refererヘッダーがない場合）
+  if (!referer) {
+    // Next.jsの画像最適化プロキシは例外的に許可
+    // User-AgentがNext.jsを含む、またはNode.jsベースのリクエストを許可
+    const isNextImageOptimization =
+      userAgent.includes("Next.js") ||
+      userAgent.includes("Node.js") ||
+      userAgent.includes("undici") || // Next.jsが使用するHTTPクライアント
+      userAgent.startsWith("node");
+
+    if (!isNextImageOptimization) {
+      console.log("Direct access blocked - no referer and not Next.js", {
+        userAgent,
+      });
+      return c.text("Access denied", 403);
+    }
+
+    console.log("Allowing Next.js image optimization request", { userAgent });
+  } else {
+    // Refererヘッダーがある場合は許可されたホストからかチェック
+    const ALLOWED_HOSTS = new Set([c.env.APP_HOST, "localhost"]);
+
+    let hostname: string;
+    try {
+      hostname = new URL(referer).hostname.toLowerCase();
+    } catch (error) {
+      console.error("Invalid Referer header:", referer, error);
+      return c.text("Bad Request", 400);
+    }
+
+    if (!ALLOWED_HOSTS.has(hostname)) {
+      console.log("Access denied - invalid referer hostname", {
+        hostname,
+        referer,
+      });
+      return c.text("Access denied", 403);
+    }
   }
-  if (!ALLOW_HOSTS.has(hostname)) {
-    return c.text("Bad Request", 400);
-  }
+
   return corsMiddleware(c, next);
 });
 app.get("*", (c) => handleProxy(c, "GET"));
