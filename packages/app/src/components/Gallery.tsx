@@ -194,7 +194,6 @@ export default function Gallery() {
                     height={504}
                     loading="lazy"
                     src={mediaUrl}
-                    unoptimized
                     width={504}
                   />
                 ) : (
