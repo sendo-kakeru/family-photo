@@ -1,8 +1,22 @@
 Googleドライブの課金が高いので自前で安く済ませるアプリケーションです。
 
 ## 想定コスト
-- 100GB: $0.6
-- 200GB: $1.2
+- エグレスは無料:
+  - Backblaze B2とCloudflareの提携により、Cloudflare経由のダウンロード配信は無料
+  - https://www.backblaze.com/docs/cloud-storage-deliver-public-backblaze-b2-content-through-cloudflare-cdn
+- 保存容量: 10GBは無料それ以上に対して費用がかかる
+
+### Backblaze B2
+- 100GB: $0.54 / 月（記述現在約82円）
+  - 100GB − 10GB = 90GB
+  - 90 × $0.006
+- 200GB: $1.14 / 月（記述現在約173円）
+  - 200GB − 10GB = 190GB
+  - 190 × $0.006
+
+### Googleドライブ
+  - 100GB: 290円 / 月
+  - 200GB: 440円 / 月
 
 ## 機能
 - 一括アップロード
