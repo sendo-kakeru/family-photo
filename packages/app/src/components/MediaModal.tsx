@@ -1,8 +1,8 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Download, Loader2, X } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useState } from "react";
-import OptimizedImage from "@/components/OptimizedImage";
 import { Button } from "@/components/ui/button";
 
 type MediaType = "image" | "video";
@@ -163,17 +163,18 @@ export default function MediaModal({
       >
         {mediaType === "image" ? (
           <>
-            <OptimizedImage
+            <Image
               alt={currentMedia.key}
               className="max-h-full max-w-full object-contain"
-              format="webp"
+              height={800}
               onLoad={() => setImageLoading(false)}
-              quality={90}
               src={mediaUrl}
               style={{
                 opacity: imageLoading ? 0 : 1,
                 transition: "opacity 0.3s ease-in-out",
               }}
+              unoptimized
+              width={800}
             />
             {imageLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
