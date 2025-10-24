@@ -1,6 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
+import { etag } from "hono/etag";
 
 type Env = {
   BUCKET_NAME: string;
@@ -16,6 +17,23 @@ type Env = {
 type HonoEnv = { Bindings: Env };
 
 const app = new Hono<HonoEnv>();
+
+// ETagミドルウェアを適用
+app.use("*", etag());
+
+// キャッシュヘッダーミドルウェア（メディアファイル用）
+app.use("*", async (c, next) => {
+  await next();
+
+  // メディアファイルには長期キャッシュを設定
+  c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  c.res.headers.set("Vary", "Accept-Encoding, Accept");
+
+  // Last-Modifiedがない場合は設定
+  if (!c.res.headers.has("Last-Modified")) {
+    c.res.headers.set("Last-Modified", new Date().toUTCString());
+  }
+});
 
 const UNSIGNABLE_HEADERS = [
   "x-forwarded-proto",

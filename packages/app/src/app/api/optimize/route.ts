@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 
@@ -16,9 +17,18 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const referer = request.headers.get("Referer");
   try {
-    // 元画像を取得
-    const response = await fetch(url);
+    const response = await fetch(
+      url,
+      referer
+        ? {
+            headers: {
+              Referer: referer,
+            },
+          }
+        : undefined,
+    );
     if (!response.ok) {
       return NextResponse.json(
         { error: "Failed to fetch image" },
@@ -28,6 +38,21 @@ export async function GET(request: NextRequest) {
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const etag = generateETag(url, width, height, quality, format);
+    const ifNoneMatch = request.headers.get("If-None-Match");
+
+    if (ifNoneMatch === etag) {
+      const notModifiedHeaders = new Headers();
+      notModifiedHeaders.set("ETag", etag);
+      notModifiedHeaders.set(
+        "Cache-Control",
+        "public, max-age=31536000, immutable",
+      );
+      return new NextResponse(null, {
+        headers: notModifiedHeaders,
+        status: 304,
+      });
+    }
 
     // sharpで画像を処理
     let image = sharp(buffer);
@@ -73,8 +98,11 @@ export async function GET(request: NextRequest) {
     // キャッシュヘッダーを設定
     const headers = new Headers();
     headers.set("Content-Type", contentType);
+    headers.set("ETag", etag);
     headers.set("Cache-Control", "public, max-age=31536000, immutable");
     headers.set("Content-Length", outputBuffer.length.toString());
+    headers.set("Last-Modified", new Date().toUTCString());
+    headers.set("Vary", "Accept-Encoding");
 
     return new NextResponse(new Uint8Array(outputBuffer), { headers });
   } catch (error) {
@@ -84,4 +112,22 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+function generateETag(
+  url: string,
+  width: string | null,
+  height: string | null,
+  quality: string | null,
+  format: string | null,
+): string {
+  const params = [
+    url,
+    width ?? "",
+    height ?? "",
+    quality ?? "75",
+    format ?? "webp",
+  ].join("|");
+  const hash = createHash("md5").update(params).digest("hex");
+  return `"${hash}"`;
 }
