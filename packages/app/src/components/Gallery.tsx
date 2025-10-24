@@ -1,11 +1,11 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ChevronDown, Loader2, Play } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
+import OptimizedImage from "@/components/OptimizedImage";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -188,24 +188,26 @@ export default function Gallery() {
                 href={type === "video" ? `/watch/${item.key}` : mediaUrl}
               >
                 {type === "image" ? (
-                  <Image
+                  <OptimizedImage
                     alt={`${index + 1}`}
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    height={504}
+                    format="webp"
+                    height={400}
                     loading="lazy"
+                    quality={75}
                     src={mediaUrl}
-                    width={504}
+                    width={400}
                   />
                 ) : (
                   <div className="relative h-full w-full">
                     <video
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                      height={504}
+                      height={400}
                       muted
                       playsInline
                       preload="metadata"
                       src={mediaUrl}
-                      width={504}
+                      width={400}
                     />
                     <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
                       <Play className="h-10 w-10 text-white drop-shadow" />
