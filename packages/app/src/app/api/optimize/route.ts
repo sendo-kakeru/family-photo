@@ -57,6 +57,9 @@ export async function GET(request: NextRequest) {
     // sharpで画像を処理
     let image = sharp(buffer);
 
+    // EXIF向き情報を自動修正
+    image = image.rotate();
+
     // サイズ変更
     if (width || height) {
       const w = width ? Number.parseInt(width, 10) : undefined;
