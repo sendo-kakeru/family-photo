@@ -1,10 +1,10 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ChevronDown, Loader2, Play } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
+import MediaModal from "@/components/MediaModal";
 import OptimizedImage from "@/components/OptimizedImage";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +37,8 @@ export default function Gallery() {
   const [columns, setColumns] = useState<2 | 3 | 4 | 5 | 6>(4);
   const [isColsOpen, setIsColsOpen] = useState(false);
   const [showScrollButtons, setShowScrollButtons] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
   const { data: totalCount } = useSWR<{ count: number }>(
     "/api/medias/count",
@@ -123,6 +125,10 @@ export default function Gallery() {
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const navigateModal = (index: number) => {
+    setCurrentMediaIndex(index);
+  };
+
   const gridColsClass = {
     2: "grid-cols-2",
     3: "grid-cols-3",
@@ -183,9 +189,13 @@ export default function Gallery() {
 
           return (
             <div className="group relative" key={item.key}>
-              <Link
-                className="media-tile relative block aspect-square overflow-hidden rounded-md bg-gray-100"
-                href={type === "video" ? `/watch/${item.key}` : mediaUrl}
+              <button
+                className="media-tile relative block aspect-square w-full overflow-hidden rounded-md bg-gray-100"
+                onClick={() => {
+                  setCurrentMediaIndex(index);
+                  setModalOpen(true);
+                }}
+                type="button"
               >
                 {type === "image" ? (
                   <OptimizedImage
@@ -214,7 +224,7 @@ export default function Gallery() {
                     </div>
                   </div>
                 )}
-              </Link>
+              </button>
             </div>
           );
         })}
@@ -270,6 +280,16 @@ export default function Gallery() {
           </Button>
         </>
       )}
+
+      {/* メディアモーダル */}
+      <MediaModal
+        allMedia={medias}
+        currentIndex={currentMediaIndex}
+        currentMedia={medias[currentMediaIndex] || null}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onNavigate={navigateModal}
+      />
     </>
   );
 }
