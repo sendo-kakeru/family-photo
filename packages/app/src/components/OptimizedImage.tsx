@@ -6,6 +6,7 @@ type OptimizedImageProps = ComponentProps<"img"> & {
   src: string;
   quality?: number;
   format?: "webp" | "jpeg" | "png" | "avif";
+  original?: boolean;
   onLoad?: () => void;
   onError?: () => void;
 };
@@ -16,6 +17,7 @@ export default function OptimizedImage({
   format = "webp",
   onLoad,
   onError,
+  original,
   ...imgProps
 }: OptimizedImageProps) {
   const [imageError, setImageError] = useState(false);
@@ -25,6 +27,10 @@ export default function OptimizedImage({
   const getOptimizedUrl = (originalUrl: string) => {
     const params = new URLSearchParams();
     params.set("url", originalUrl);
+    if (original) {
+      params.set("original", String(original));
+      return `/api/optimize?${params.toString()}`;
+    }
     if (imgProps.width) params.set("width", imgProps.width.toString());
     if (imgProps.height) params.set("height", imgProps.height.toString());
     params.set("quality", quality.toString());
