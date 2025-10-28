@@ -1,6 +1,5 @@
 import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import { etag } from "hono/etag";
 import { decode } from "next-auth/jwt";
@@ -214,10 +213,12 @@ app.use("*", async (c, next) => {
       .map((split) => split.trim().toLowerCase())
       .filter(Boolean),
   );
-  const token = getCookie(c, "authjs.session-token");
-  if (!token) {
+  const authorizationHeader = c.req.header("Authorization");
+  if (!authorizationHeader || !authorizationHeader.startsWith("Bearer")) {
     return c.text("Unauthorized", 401);
   }
+  const token = authorizationHeader.split("Bearer")[1]?.trim();
+
   try {
     const decoded = await decode({
       salt: c.env.AUTH_SALT,

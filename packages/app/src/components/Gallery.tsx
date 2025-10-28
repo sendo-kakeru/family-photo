@@ -185,7 +185,10 @@ export default function Gallery() {
       <div className={`grid ${gridColsClass} gap-2`}>
         {medias.map((item, index) => {
           const type = inferType(item);
-          const mediaUrl = `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`;
+          const mediaUrl =
+            type === "image"
+              ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`
+              : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`)}&original=true`;
 
           return (
             <div className="group relative" key={item.key}>

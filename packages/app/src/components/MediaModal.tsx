@@ -1,9 +1,10 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Download, Loader2, X } from "lucide-react";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import OptimizedImage from "./OptimizedImage";
 
 type MediaType = "image" | "video";
 
@@ -123,7 +124,10 @@ export default function MediaModal({
   if (!isOpen || !currentMedia) return null;
 
   const mediaType = inferType(currentMedia);
-  const mediaUrl = `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${currentMedia.key}`;
+  const mediaUrl =
+    mediaType === "image"
+      ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${currentMedia.key}`
+      : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${currentMedia.key}`)}&original=true`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black md:bg-black/90">
@@ -163,17 +167,16 @@ export default function MediaModal({
       >
         {mediaType === "image" ? (
           <>
-            <Image
+            <OptimizedImage
               alt={currentMedia.key}
-              className="max-h-full max-w-full object-contain"
+              className={cn(
+                "max-h-full max-w-full object-contain transition-opacity duration-300",
+                imageLoading ? "opacity-0" : "opacity-100",
+              )}
               height={800}
               onLoad={() => setImageLoading(false)}
+              original
               src={mediaUrl}
-              style={{
-                opacity: imageLoading ? 0 : 1,
-                transition: "opacity 0.3s ease-in-out",
-              }}
-              unoptimized
               width={800}
             />
             {imageLoading && (
