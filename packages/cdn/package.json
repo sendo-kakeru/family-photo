@@ -1,7 +1,8 @@
 {
   "dependencies": {
     "aws4fetch": "^1.0.20",
-    "hono": "^4.10.3"
+    "hono": "^4.10.3",
+    "next-auth": "5.0.0-beta.30"
   },
   "devDependencies": {
     "wrangler": "^4.45.1"

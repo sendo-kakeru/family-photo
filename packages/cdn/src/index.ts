@@ -1,7 +1,9 @@
 import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
+import { getCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import { etag } from "hono/etag";
+import { decode } from "next-auth/jwt";
 
 type Env = {
   BUCKET_NAME: string;
@@ -12,6 +14,9 @@ type Env = {
   RCLONE_DOWNLOAD?: string;
   ALLOWED_HEADERS?: string[];
   APP_HOST: string;
+  ALLOW_EMAILS: string;
+  AUTH_SECRET: string;
+  AUTH_SALT: string;
 };
 
 type HonoEnv = { Bindings: Env };
@@ -51,16 +56,21 @@ const HTTPS_PORT = "443";
 const RANGE_RETRY_ATTEMPTS = 3;
 
 function filterHeaders(headers: Headers, env: Env): Headers {
-  return new Headers(
-    Array.from(headers.entries()).filter(
-      ([key]) =>
-        !(
-          UNSIGNABLE_HEADERS.includes(key) ||
-          key.startsWith("cf-") ||
-          (env.ALLOWED_HEADERS && !env.ALLOWED_HEADERS.includes(key))
-        ),
-    ),
-  );
+  const filteredHeaders: [string, string][] = [];
+
+  headers.forEach((value, key) => {
+    if (
+      !(
+        UNSIGNABLE_HEADERS.includes(key) ||
+        key.startsWith("cf-") ||
+        (env.ALLOWED_HEADERS && !env.ALLOWED_HEADERS.includes(key))
+      )
+    ) {
+      filteredHeaders.push([key, value]);
+    }
+  });
+
+  return new Headers(filteredHeaders);
 }
 
 function createHeadResponse(response: Response): Response {
@@ -199,16 +209,27 @@ app.use("*", async (c, next) => {
     origin: [`https://${c.env.APP_HOST}`, "http://localhost:3000"],
   });
 
-  const ALLOW_HOSTS = new Set<string>([c.env.APP_HOST, "localhost"]);
-  let hostname: string;
-  try {
-    hostname = new URL(c.req.header("Referer") ?? "").hostname.toLowerCase();
-  } catch (error) {
-    console.error("Invalid Referer header:", c.req.header("Referer"), error);
-    return c.text("Bad Request", 400);
+  const ALLOW_EMAILS = new Set(
+    c.env.ALLOW_EMAILS?.split(",")
+      .map((split) => split.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const token = getCookie(c, "next-auth.session-token");
+  if (!token) {
+    return c.text("Unauthorized", 401);
   }
-  if (!ALLOW_HOSTS.has(hostname)) {
-    return c.text("Bad Request", 400);
+  try {
+    const decoded = await decode({
+      salt: c.env.AUTH_SALT,
+      secret: c.env.AUTH_SECRET,
+      token,
+    });
+    if (!decoded || !decoded.email) throw new Error("Invalid token");
+    if (!ALLOW_EMAILS.has(decoded.email.toLowerCase()))
+      throw new Error("Forbidden");
+  } catch (error) {
+    console.error("Authentication failed:", error);
+    return c.text("Forbidden", 403);
   }
   return corsMiddleware(c, next);
 });
