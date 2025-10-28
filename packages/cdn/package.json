@@ -4,7 +4,7 @@
     "hono": "^4.10.1"
   },
   "devDependencies": {
-    "wrangler": "^4.45.0"
+    "wrangler": "^4.45.1"
   },
   "name": "@repo/cdn",
   "scripts": {
