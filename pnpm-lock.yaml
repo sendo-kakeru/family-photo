@@ -108,6 +108,9 @@ importers:
       hono:
         specifier: ^4.10.3
         version: 4.10.3
+      next-auth:
+        specifier: 5.0.0-beta.30
+        version: 5.0.0-beta.30(next@16.0.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0)
     devDependencies:
       wrangler:
         specifier: ^4.45.1
