@@ -5,7 +5,9 @@ import sharp from "sharp";
 
 export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
-  const token = cookieStore.get("authjs.session-token")?.value;
+  const token =
+    cookieStore.get("__Secure-authjs.session-token")?.value ||
+    cookieStore.get("authjs.session-token")?.value;
   const searchParams = request.nextUrl.searchParams;
   const url = searchParams.get("url");
   const width = searchParams.get("width");

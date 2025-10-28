@@ -3,7 +3,9 @@ import { type NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
-  const token = cookieStore.get("authjs.session-token")?.value;
+  const token =
+    cookieStore.get("__Secure-authjs.session-token")?.value ||
+    cookieStore.get("authjs.session-token")?.value;
   try {
     const { searchParams } = new URL(request.url);
     const path = searchParams.get("path");
