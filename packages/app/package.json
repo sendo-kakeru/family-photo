@@ -43,7 +43,7 @@
     "format": "biome check --fix --unsafe .",
     "lint": "biome check",
     "start": "next start",
-    "typecheck": "tsc"
+    "typecheck": "tsc --noEmit"
   },
   "version": "0.1.0"
 }
