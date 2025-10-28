@@ -8,7 +8,6 @@ updates:
       day: 'sunday'
     assignees:
       - "sendo-kakeru"
-    open-pull-requests-limit: 20
     ignore:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
@@ -19,6 +18,7 @@ updates:
       interval: "weekly"
     assignees:
       - "sendo-kakeru"
+    open-pull-requests-limit: 20
     groups:
       react:
         patterns:
