@@ -17,18 +17,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const referer = request.headers.get("Referer");
   try {
-    const response = await fetch(
-      url,
-      referer
-        ? {
-            headers: {
-              Referer: referer,
-            },
-          }
-        : undefined,
-    );
+    const response = await fetch(url);
     if (!response.ok) {
       return NextResponse.json(
         { error: "Failed to fetch image" },

@@ -12,19 +12,7 @@ export async function GET(request: NextRequest) {
     // CDNからファイルを取得
     const cdnUrl = `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${path}`;
 
-    // リファラヘッダーを設定（CDNの設定に合わせる）
-    const referer = request.headers.get("referer");
-
-    const response = await fetch(
-      cdnUrl,
-      referer
-        ? {
-            headers: {
-              Referer: referer,
-            },
-          }
-        : undefined,
-    );
+    const response = await fetch(cdnUrl);
 
     if (!response.ok) {
       console.error(

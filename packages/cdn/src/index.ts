@@ -214,7 +214,7 @@ app.use("*", async (c, next) => {
       .map((split) => split.trim().toLowerCase())
       .filter(Boolean),
   );
-  const token = getCookie(c, "next-auth.session-token");
+  const token = getCookie(c, "authjs.session-token");
   if (!token) {
     return c.text("Unauthorized", 401);
   }
