@@ -106,8 +106,8 @@ importers:
         specifier: ^1.0.20
         version: 1.0.20
       hono:
-        specifier: ^4.10.3
-        version: 4.10.3
+        specifier: ^4.10.4
+        version: 4.10.4
       next-auth:
         specifier: 5.0.0-beta.30
         version: 5.0.0-beta.30(next@16.0.1(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0)
@@ -1614,8 +1614,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  hono@4.10.3:
-    resolution: {integrity: sha512-2LOYWUbnhdxdL8MNbNg9XZig6k+cZXm5IjHn2Aviv7honhBMOHb+jxrKIeJRZJRmn+htUCKhaicxwXuUDlchRA==}
+  hono@4.10.4:
+    resolution: {integrity: sha512-YG/fo7zlU3KwrBL5vDpWKisLYiM+nVstBQqfr7gCPbSYURnNEP9BDxEMz8KfsDR9JX0lJWDRNc6nXX31v7ZEyg==}
     engines: {node: '>=16.9.0'}
 
   is-arrayish@0.3.4:
@@ -3784,7 +3784,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  hono@4.10.3: {}
+  hono@4.10.4: {}
 
   is-arrayish@0.3.4: {}
 
