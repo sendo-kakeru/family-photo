@@ -1,11 +1,11 @@
 {
   "dependencies": {
     "aws4fetch": "^1.0.20",
-    "hono": "^4.10.3",
+    "hono": "^4.10.4",
     "next-auth": "5.0.0-beta.30"
   },
   "devDependencies": {
-    "wrangler": "^4.45.1"
+    "wrangler": "^4.45.3"
   },
   "name": "@repo/cdn",
   "scripts": {
