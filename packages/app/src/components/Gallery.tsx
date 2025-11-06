@@ -39,6 +39,8 @@ export default function Gallery() {
   const [showScrollButtons, setShowScrollButtons] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  // モーダル用に pushState したかどうかを追跡
+  const modalHistoryPushedRef = useRef(false);
 
   const { data: totalCount } = useSWR<{ count: number }>(
     "/api/medias/count",
@@ -129,6 +131,42 @@ export default function Gallery() {
     setCurrentMediaIndex(index);
   };
 
+  // モーダルを開く: まず履歴にモーダル専用 state を積んでから開く
+  const openModal = (index: number) => {
+    setCurrentMediaIndex(index);
+    // 既に積んでいる場合は二重に積まない
+    if (!modalHistoryPushedRef.current) {
+      window.history.pushState({ galleryModal: true, mediaIndex: index }, "");
+      modalHistoryPushedRef.current = true;
+    }
+    setModalOpen(true);
+  };
+
+  // ボタン等から閉じる: pushState した分だけ戻る(=popstateで閉じる)
+  const requestCloseModal = () => {
+    if (modalHistoryPushedRef.current) {
+      window.history.back();
+      return;
+    }
+    setModalOpen(false);
+  };
+
+  // popstate (ブラウザバック) 時にモーダルを閉じる
+  useEffect(() => {
+    const handlePopState = () => {
+      // モーダル履歴を抜けた (戻る) とき
+      if (
+        modalHistoryPushedRef.current &&
+        !window.history.state?.galleryModal
+      ) {
+        modalHistoryPushedRef.current = false;
+        setModalOpen(false);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const gridColsClass = {
     2: "grid-cols-2",
     3: "grid-cols-3",
@@ -194,10 +232,7 @@ export default function Gallery() {
             <div className="group relative" key={item.key}>
               <button
                 className="media-tile relative block aspect-square w-full overflow-hidden rounded-md bg-gray-100"
-                onClick={() => {
-                  setCurrentMediaIndex(index);
-                  setModalOpen(true);
-                }}
+                onClick={() => openModal(index)}
                 type="button"
               >
                 {type === "image" ? (
@@ -290,7 +325,7 @@ export default function Gallery() {
         currentIndex={currentMediaIndex}
         currentMedia={medias[currentMediaIndex] || null}
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={requestCloseModal}
         onNavigate={navigateModal}
       />
     </>
