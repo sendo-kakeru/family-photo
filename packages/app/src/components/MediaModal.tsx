@@ -3,16 +3,9 @@
 import { ChevronLeft, ChevronRight, Download, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { buildMediaUrl, inferMediaType, type MediaItem } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import OptimizedImage from "./OptimizedImage";
-
-type MediaType = "image" | "video";
-
-type MediaItem = {
-  key: string;
-  size: number;
-  lastModified: string;
-};
 
 type MediaModalProps = {
   isOpen: boolean;
@@ -35,13 +28,6 @@ export default function MediaModal({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [imageLoading, setImageLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-
-  const inferType = (item: MediaItem): MediaType => {
-    const key = item.key.toLowerCase();
-    if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(key)) return "image";
-    if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(key)) return "video";
-    return "image";
-  };
 
   const goToPrevious = () => {
     if (currentIndex > 0) {
@@ -123,11 +109,8 @@ export default function MediaModal({
 
   if (!isOpen || !currentMedia) return null;
 
-  const mediaType = inferType(currentMedia);
-  const mediaUrl =
-    mediaType === "image"
-      ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${currentMedia.key}`
-      : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${currentMedia.key}`)}&original=true`;
+  const mediaType = inferMediaType(currentMedia);
+  const mediaUrl = buildMediaUrl(currentMedia, mediaType);
 
   return (
     <div className="fixed inset-0 z-50 bg-black md:bg-black/90">

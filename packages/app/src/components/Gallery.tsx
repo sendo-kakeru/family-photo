@@ -12,14 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
-type MediaType = "image" | "video";
-
-type MediaItem = {
-  key: string; // 配信用パス
-  size: number; // バイト数
-  lastModified: string; // ISO文字列
-};
+import { buildMediaUrl, inferMediaType, type MediaItem } from "@/lib/media";
 
 type MediasResponse = {
   medias: MediaItem[]; // 一覧
@@ -83,13 +76,6 @@ export default function Gallery() {
   const isEmpty = data?.[0]?.medias?.length === 0;
   const isReachingEnd =
     isEmpty || (data && !data[data.length - 1]?.isTruncated);
-
-  const inferType = (item: MediaItem): MediaType => {
-    const key = item.key.toLowerCase();
-    if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(key)) return "image";
-    if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(key)) return "video";
-    return "image";
-  };
 
   // Infinite scroll
   useEffect(() => {
@@ -222,11 +208,8 @@ export default function Gallery() {
       {/* ギャラリー */}
       <div className={`grid ${gridColsClass} gap-2`}>
         {medias.map((item, index) => {
-          const type = inferType(item);
-          const mediaUrl =
-            type === "image"
-              ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`
-              : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`)}&original=true`;
+          const type = inferMediaType(item);
+          const mediaUrl = buildMediaUrl(item, type);
 
           return (
             <div className="group relative" key={item.key}>
