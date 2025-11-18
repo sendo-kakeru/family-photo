@@ -6,7 +6,7 @@
     "typescript": "5.9.3"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "name": "family-photo",
   "packageManager": "pnpm@10.17.0",

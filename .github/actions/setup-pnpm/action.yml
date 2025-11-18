@@ -19,7 +19,7 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: "22.0.0"
+        node-version: "24.0.0"
         cache: pnpm
 
     - name: Set config
