@@ -43,3 +43,6 @@ updates:
         patterns:
           - vitest
           - '@vitest/*'
+      aws-sdk:
+        patterns:
+          - '@aws-sdk/*'
