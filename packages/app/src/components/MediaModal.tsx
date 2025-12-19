@@ -200,7 +200,7 @@ export default function MediaModal({
       {/* ナビゲーションボタン */}
       {currentIndex > 0 && (
         <Button
-          className="-translate-y-1/2 absolute top-1/2 left-2 h-8 w-8 text-white hover:bg-white/20 md:left-4 md:h-10 md:w-10"
+          className="absolute top-1/2 left-2 h-8 w-8 -translate-y-1/2 text-white hover:bg-white/20 md:left-4 md:h-10 md:w-10"
           onClick={goToPrevious}
           size="icon"
           variant="ghost"
@@ -211,7 +211,7 @@ export default function MediaModal({
 
       {currentIndex < allMedia.length - 1 && (
         <Button
-          className="-translate-y-1/2 absolute top-1/2 right-2 h-8 w-8 text-white hover:bg-white/20 md:right-4 md:h-10 md:w-10"
+          className="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 text-white hover:bg-white/20 md:right-4 md:h-10 md:w-10"
           onClick={goToNext}
           size="icon"
           variant="ghost"
