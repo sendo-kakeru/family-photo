@@ -1,4 +1,8 @@
-import { type _Object, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import {
+  type _Object,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3";
 import { type NextRequest, NextResponse } from "next/server";
 import { B2_S3_BUCKET, s3 } from "@/lib/s3";
 
@@ -64,6 +68,39 @@ export async function GET(request: NextRequest) {
     console.error("Error listing medias:", error);
     return NextResponse.json(
       { error: "Failed to list medias" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { keys } = body as { keys: string[] };
+
+    if (!keys || !Array.isArray(keys) || keys.length === 0) {
+      return NextResponse.json({ error: "No keys provided" }, { status: 400 });
+    }
+
+    // S3から削除
+    const command = new DeleteObjectsCommand({
+      Bucket: B2_S3_BUCKET,
+      Delete: {
+        Objects: keys.map((key) => ({ Key: key })),
+        Quiet: false,
+      },
+    });
+
+    const response = await s3.send(command);
+
+    return NextResponse.json({
+      deleted: response.Deleted?.length || 0,
+      errors: response.Errors || [],
+    });
+  } catch (error) {
+    console.error("Error deleting medias:", error);
+    return NextResponse.json(
+      { error: "Failed to delete medias" },
       { status: 500 },
     );
   }
