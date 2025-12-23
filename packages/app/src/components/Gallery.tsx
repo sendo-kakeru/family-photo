@@ -9,6 +9,7 @@ import {
   Play,
   Trash2,
 } from "lucide-react";
+import { parseAsInteger, useQueryState } from "nuqs";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
@@ -42,7 +43,10 @@ export default function Gallery() {
   const observerTargetRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
-  const [columns, setColumns] = useState<2 | 3 | 4 | 5 | 6>(4);
+  const [columns, setColumns] = useQueryState(
+    "columns",
+    parseAsInteger.withDefault(4),
+  );
   const [isColsOpen, setIsColsOpen] = useState(false);
   const [showScrollButtons, setShowScrollButtons] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -239,13 +243,14 @@ export default function Gallery() {
     }
   };
 
-  const gridColsClass = {
+  const gridColsMap: Record<number, string> = {
     2: "grid-cols-2",
     3: "grid-cols-3",
     4: "grid-cols-4",
     5: "grid-cols-5",
     6: "grid-cols-6",
-  }[columns];
+  };
+  const gridColsClass = gridColsMap[columns] ?? "grid-cols-4";
 
   return (
     <>

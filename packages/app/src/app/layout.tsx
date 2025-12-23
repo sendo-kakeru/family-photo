@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { cn } from "@/lib/utils";
@@ -24,8 +25,10 @@ export default function RootLayout({
           inter.variable,
         )}
       >
-        <Header />
-        <main className="grid h-full">{children}</main>
+        <NuqsAdapter>
+          <Header />
+          <main className="grid h-full">{children}</main>
+        </NuqsAdapter>
       </body>
     </html>
   );
