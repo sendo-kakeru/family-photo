@@ -1,6 +1,14 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronDown, Loader2, Play } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  Loader2,
+  Play,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
@@ -41,15 +49,18 @@ export default function Gallery() {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   // モーダル用に pushState したかどうかを追跡
   const modalHistoryPushedRef = useRef(false);
+  // 選択モード
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const { data: totalCount } = useSWR<{ count: number }>(
-    "/api/medias/count",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-    },
-  );
+  const { data: totalCount, mutate: totalCountMutate } = useSWR<{
+    count: number;
+  }>("/api/medias/count", fetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
 
   // SWR Infinite for pagination
   const getKey = (
@@ -66,14 +77,16 @@ export default function Gallery() {
     return `/api/medias?${params.toString()}`;
   };
 
-  const { data, error, size, setSize } = useSWRInfinite<MediasResponse>(
-    getKey,
-    fetcher,
-    {
-      revalidateAll: false,
-      revalidateFirstPage: false,
-    },
-  );
+  const {
+    data,
+    error,
+    size,
+    setSize,
+    mutate: mediasMutate,
+  } = useSWRInfinite<MediasResponse>(getKey, fetcher, {
+    revalidateAll: false,
+    revalidateFirstPage: false,
+  });
 
   const medias = data ? data.flatMap((page) => page.medias ?? []) : [];
   const isLoadingInitialData = !data && !error;
@@ -167,6 +180,65 @@ export default function Gallery() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  // 選択モードを切り替え
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    if (isSelectionMode) {
+      setSelectedKeys(new Set());
+    }
+  };
+
+  // 画像の選択/選択解除
+  const toggleSelection = (key: string) => {
+    const newSelected = new Set(selectedKeys);
+    if (newSelected.has(key)) {
+      newSelected.delete(key);
+    } else {
+      newSelected.add(key);
+    }
+    setSelectedKeys(newSelected);
+  };
+
+  // 全選択/全解除
+  const toggleSelectAll = () => {
+    if (selectedKeys.size === medias.length) {
+      setSelectedKeys(new Set());
+    } else {
+      setSelectedKeys(new Set(medias.map((m) => m.key)));
+    }
+  };
+
+  // 削除実行
+  const handleDelete = async () => {
+    if (selectedKeys.size === 0) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch("/api/medias", {
+        body: JSON.stringify({ keys: Array.from(selectedKeys) }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("削除に失敗しました");
+      }
+
+      // データを再取得
+      await totalCountMutate();
+      await mediasMutate();
+
+      setSelectedKeys(new Set());
+      setIsSelectionMode(false);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("削除に失敗しました");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const gridColsClass = {
     2: "grid-cols-2",
     3: "grid-cols-3",
@@ -180,33 +252,65 @@ export default function Gallery() {
       {/* トップアンカー */}
       <div ref={topRef} />
       <div className="grid justify-between gap-y-4 py-4">
-        {/* 列数切替 */}
-        <Popover onOpenChange={setIsColsOpen} open={isColsOpen}>
-          <PopoverTrigger asChild>
-            <Button className="w-fit" size="sm" variant="outline">
-              {columns}列
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-32 p-2">
-            <div className="grid gap-2">
-              {([2, 3, 4, 5, 6] as const).map((col) => (
-                <Button
-                  className="w-full justify-center"
-                  key={col}
-                  onClick={() => {
-                    setColumns(col);
-                    setIsColsOpen(false);
-                  }}
-                  size="sm"
-                  variant={columns === col ? "default" : "outline"}
-                >
-                  {col}列
+        {/* ツールバー */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-2">
+            {/* 列数切替 */}
+            <Popover onOpenChange={setIsColsOpen} open={isColsOpen}>
+              <PopoverTrigger asChild>
+                <Button className="w-fit" size="sm" variant="outline">
+                  {columns}列
+                  <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
-              ))}
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-32 p-2">
+                <div className="grid gap-2">
+                  {([2, 3, 4, 5, 6] as const).map((col) => (
+                    <Button
+                      className="w-full justify-center"
+                      key={col}
+                      onClick={() => {
+                        setColumns(col);
+                        setIsColsOpen(false);
+                      }}
+                      size="sm"
+                      variant={columns === col ? "default" : "outline"}
+                    >
+                      {col}列
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* 選択モード切替 */}
+            <Button
+              onClick={toggleSelectionMode}
+              size="sm"
+              variant={isSelectionMode ? "default" : "outline"}
+            >
+              {isSelectionMode ? "選択モード解除" : "選択"}
+            </Button>
+          </div>
+
+          {/* 選択モード時のアクション */}
+          {isSelectionMode && (
+            <div className="flex gap-2">
+              <Button onClick={toggleSelectAll} size="sm" variant="outline">
+                {selectedKeys.size === medias.length ? "全解除" : "全選択"}
+              </Button>
+              <Button
+                disabled={selectedKeys.size === 0}
+                onClick={() => setShowDeleteConfirm(true)}
+                size="sm"
+                variant="destructive"
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                削除 ({selectedKeys.size})
+              </Button>
             </div>
-          </PopoverContent>
-        </Popover>
+          )}
+        </div>
 
         {/* カウンター */}
         <div className="text-gray-600 text-sm">
@@ -227,12 +331,19 @@ export default function Gallery() {
             type === "image"
               ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`
               : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`)}&original=true`;
+          const isSelected = selectedKeys.has(item.key);
 
           return (
             <div className="group relative" key={item.key}>
               <button
                 className="media-tile relative block aspect-square w-full overflow-hidden rounded-md bg-gray-100"
-                onClick={() => openModal(index)}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    toggleSelection(item.key);
+                  } else {
+                    openModal(index);
+                  }
+                }}
                 type="button"
               >
                 {type === "image" ? (
@@ -260,6 +371,18 @@ export default function Gallery() {
                     <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
                       <Play className="h-10 w-10 text-white drop-shadow" />
                     </div>
+                  </div>
+                )}
+                {/* 選択モード時のチェックマーク */}
+                {isSelectionMode && (
+                  <div
+                    className={`absolute top-2 right-2 h-6 w-6 rounded-full border-2 ${
+                      isSelected
+                        ? "border-blue-500 bg-blue-500"
+                        : "border-white bg-black/20"
+                    } flex items-center justify-center`}
+                  >
+                    {isSelected && <Check className="h-4 w-4 text-white" />}
                   </div>
                 )}
               </button>
@@ -328,6 +451,43 @@ export default function Gallery() {
         onClose={requestCloseModal}
         onNavigate={navigateModal}
       />
+
+      {/* 削除確認ダイアログ */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="mb-4 font-bold text-lg">削除の確認</h2>
+            <p className="mb-6 text-gray-600">
+              選択した{selectedKeys.size}件のメディアを削除しますか？
+              <br />
+              この操作は元に戻せません。
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                disabled={isDeleting}
+                onClick={() => setShowDeleteConfirm(false)}
+                variant="outline"
+              >
+                キャンセル
+              </Button>
+              <Button
+                disabled={isDeleting}
+                onClick={handleDelete}
+                variant="destructive"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    削除中...
+                  </>
+                ) : (
+                  "削除"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
