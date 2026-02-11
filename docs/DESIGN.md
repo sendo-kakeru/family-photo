@@ -8,7 +8,13 @@
 
 現行アーキテクチャでは、画像のリサイズ・フォーマット変換を Vercel 上の Next.js API Route (`/api/optimize`) で Sharp を使用して実行している。しかし Vercel のリクエスト/レスポンスサイズ制限に到達し、大きな画像の変換が不可能になった。
 
-### 1.2 解決方針
+### 1.2 参考実装
+
+大枠の仕組み（Cloud Run + Cloudflare Workers による画像変換・配信パイプライン、GitHub Actions CI/CD）は以下のリポジトリに実装済み。本設計はこれをベースに family-photo 向けにカスタマイズしたものである。
+
+- https://github.com/sendo-kakeru/image-processing-delivery-rust
+
+### 1.3 解決方針
 
 画像変換処理を Cloud Run (Rust) に移行し、Cloudflare Workers によるキャッシュレイヤーを追加することで、制限のない高速なメディア配信を実現する。将来的な動画処理にも対応可能な汎用的なコンポーネント命名・構成とする。内部サービス間はプラットフォームネイティブの認証機構（Cloud Run IAM / Cloudflare Service Bindings / Cloudflare Access）で保護し、ユーザー認証は現行の next-auth (Google OAuth) を維持する。
 
@@ -104,11 +110,11 @@ Backblaze B2
 
 | リソース              | 名前                         | 備考                                 |
 | --------------------- | ---------------------------- | ------------------------------------ |
-| Edge Cache Worker     | `media-cache`                | Cloudflare Workers                   |
+| Edge Cache Worker     | `media-delivery`                | Cloudflare Workers                   |
 | Storage Proxy Worker  | `family-photo-cdn`           | Cloudflare Workers（既存）           |
 | Cloud Run サービス    | `media-processor`            | GCP                                  |
 | Artifact Registry     | `media-processor`            | GCP                                  |
-| GCP Service Account   | `media-cache-invoker`        | Edge Cache Worker → Cloud Run 認証用 |
+| GCP Service Account   | `media-delivery-invoker`        | Edge Cache Worker → Cloud Run 認証用 |
 | CF Access Application | `family-photo-storage-proxy` | Storage Proxy 保護用                 |
 | B2 バケット           | `family-photo`               | 既存。メディア原本の保存先           |
 
@@ -342,7 +348,7 @@ Edge Cache Worker は next-auth の JWT を検証し、`ALLOW_EMAILS` に含ま�
 
 同一 Cloudflare アカウント内の Worker 間通信。パブリックインターネットを経由せず、認証設定も不要。
 
-**wrangler.jsonc（media-cache）:**
+**wrangler.jsonc（media-delivery）:**
 
 ```jsonc
 {
@@ -404,7 +410,7 @@ Cloud Run (IAM が自動検証 → 200 or 403)
 
 ```bash
 PROJECT_ID="your-project-id"
-SA_EMAIL="media-cache-invoker@${PROJECT_ID}.iam.gserviceaccount.com"
+SA_EMAIL="media-delivery-invoker@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # 1. 新しい鍵を発行
 gcloud iam service-accounts keys create sa-key-new.json \
@@ -548,17 +554,13 @@ gcloud artifacts repositories create media-processor \
   --project=${PROJECT_ID}
 
 # 2. サービスアカウント作成（Edge Cache Worker → Cloud Run 認証用）
-gcloud iam service-accounts create media-cache-invoker \
+gcloud iam service-accounts create media-delivery-invoker \
   --display-name="Edge Cache Worker invoker" \
   --project=${PROJECT_ID}
 
-# 3. Secret Manager に機密情報を格納
-gcloud secrets create cf-access-client-id --project=${PROJECT_ID}
-gcloud secrets create cf-access-client-secret --project=${PROJECT_ID}
-echo -n "<CLIENT_ID>" | gcloud secrets versions add cf-access-client-id --data-file=- --project=${PROJECT_ID}
-echo -n "<CLIENT_SECRET>" | gcloud secrets versions add cf-access-client-secret --data-file=- --project=${PROJECT_ID}
-
-# 4. Cloud Run サービスの初回デプロイ（以降は GitHub Actions が更新）
+# 3. Cloud Run サービスの初回デプロイ（以降は GitHub Actions が更新）
+#    ※ CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET は GitHub Actions Secrets から
+#      --set-env-vars で渡す（セクション 9.2 参照）
 gcloud run deploy media-processor \
   --image=${REGION}-docker.pkg.dev/${PROJECT_ID}/media-processor/media-processor:initial \
   --region=${REGION} \
@@ -569,19 +571,18 @@ gcloud run deploy media-processor \
   --max-instances=4 \
   --timeout=300 \
   --set-env-vars="STORAGE_PROXY_URL=https://storage.photo.sendo-app.com,PORT=8080" \
-  --set-secrets="CF_ACCESS_CLIENT_ID=cf-access-client-id:latest,CF_ACCESS_CLIENT_SECRET=cf-access-client-secret:latest" \
   --project=${PROJECT_ID}
 
-# 5. サービスアカウントに Cloud Run 呼び出し権限を付与
+# 4. サービスアカウントに Cloud Run 呼び出し権限を付与
 gcloud run services add-iam-policy-binding media-processor \
   --region=${REGION} \
-  --member="serviceAccount:media-cache-invoker@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --member="serviceAccount:media-delivery-invoker@${PROJECT_ID}.iam.gserviceaccount.com" \
   --role="roles/run.invoker" \
   --project=${PROJECT_ID}
 
-# 6. サービスアカウント鍵の発行（Edge Cache Worker の Secret に設定）
+# 5. サービスアカウント鍵の発行（Edge Cache Worker の Secret に設定）
 gcloud iam service-accounts keys create sa-key.json \
-  --iam-account=media-cache-invoker@${PROJECT_ID}.iam.gserviceaccount.com \
+  --iam-account=media-delivery-invoker@${PROJECT_ID}.iam.gserviceaccount.com \
   --project=${PROJECT_ID}
 # → sa-key.json の内容を wrangler secret put GCP_SERVICE_ACCOUNT_KEY で設定
 ```
@@ -592,7 +593,7 @@ Cloudflare ダッシュボードで以下を設定する。
 
 | 設定項目                      | 操作場所                                                | 内容                                              |
 | ----------------------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| Edge Cache Worker ドメイン    | Workers & Pages > media-cache > Settings > Domains      | `cdn.photo.sendo-app.com`                         |
+| Edge Cache Worker ドメイン    | Workers & Pages > media-delivery > Settings > Domains      | `cdn.photo.sendo-app.com`                         |
 | Storage Proxy Worker ドメイン | Workers & Pages > family-photo-cdn > Settings > Domains | `storage.photo.sendo-app.com`                     |
 | Access Application            | Zero Trust > Access > Applications                      | Storage Proxy のドメインに Self-hosted App を作成 |
 | Access Policy                 | 同上 > Policies                                         | Action: Service Auth, Service Token を指定        |
@@ -600,11 +601,10 @@ Cloudflare ダッシュボードで以下を設定する。
 
 #### 5.3.4 Secret 管理
 
-| プラットフォーム          | 管理方法              | 対象                                             |
-| ------------------------- | --------------------- | ------------------------------------------------ |
-| GCP Secret Manager        | `gcloud secrets`      | CF Access Client ID / Secret（Cloud Run に注入） |
-| Cloudflare Worker Secrets | `wrangler secret put` | GCP SA 鍵, AUTH_SECRET, AUTH_SALT                |
-| GitHub Actions Secrets    | リポジトリ Settings   | GCP 認証情報, Cloudflare API Token               |
+| プラットフォーム          | 管理方法              | 対象                                                                  |
+| ------------------------- | --------------------- | --------------------------------------------------------------------- |
+| GitHub Actions Secrets    | リポジトリ Settings   | GCP 認証情報, Cloudflare API Token, CF Access Client ID / Secret      |
+| Cloudflare Worker Secrets | `wrangler secret put` | GCP SA 鍵, AUTH_SECRET, AUTH_SALT                                     |
 
 ---
 
@@ -614,14 +614,14 @@ Cloudflare ダッシュボードで以下を設定する。
 family-photo/
 ├── packages/
 │   ├── app/                          # Next.js Frontend (Vercel) ※既存
-│   ├── media-cache/                  # Edge Cache Worker (Hono) ※新規
+│   ├── media-delivery/                  # Edge Cache Worker (Hono) ※新規
 │   ├── cdn/                          # Storage Proxy Worker (Hono) ※既存・改修
 │   └── media-processor/              # Cloud Run (Rust / Axum) ※新規
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                    # ※既存
 │   │   ├── deploy-cdn-prod.yml       # Storage Proxy ※既存
-│   │   ├── deploy-media-cache.yml    # Edge Cache Worker ※新規
+│   │   ├── deploy-media-delivery.yml    # Edge Cache Worker ※新規
 │   │   └── deploy-media-processor.yml # Cloud Run ※新規
 │   └── actions/
 │       └── setup-pnpm/              # ※既存
@@ -637,7 +637,7 @@ family-photo/
 | パッケージ        | 言語       | ランタイム         | 説明                            |
 | ----------------- | ---------- | ------------------ | ------------------------------- |
 | `app`             | TypeScript | Node.js (Vercel)   | フロントエンド・管理 API        |
-| `media-cache`     | TypeScript | Cloudflare Workers | キャッシュ・認証・プロキシ      |
+| `media-delivery`     | TypeScript | Cloudflare Workers | キャッシュ・認証・プロキシ      |
 | `cdn`             | TypeScript | Cloudflare Workers | B2 署名付きプロキシ（既存改修） |
 | `media-processor` | Rust       | Cloud Run (Docker) | メディア変換処理                |
 
@@ -706,7 +706,7 @@ Cloudflare Cache API `cache.delete()` で個別パージ可能。将来的に管
 | ---------------------------- | ---------------------- | ----------------------------- |
 | `ci.yml`                     | push / PR (全ブランチ) | `**/*`                        |
 | `deploy-cdn-prod.yml`        | push to `main`         | `packages/cdn/**`             |
-| `deploy-media-cache.yml`     | push to `main`         | `packages/media-cache/**`     |
+| `deploy-media-delivery.yml`     | push to `main`         | `packages/media-delivery/**`     |
 | `deploy-media-processor.yml` | push to `main`         | `packages/media-processor/**` |
 
 ### 9.2 Cloud Run デプロイフロー
@@ -715,8 +715,10 @@ Cloudflare Cache API `cache.delete()` で個別パージ可能。将来的に管
 push to main (packages/media-processor/**)
   → Docker build (multi-stage)
   → Push to Artifact Registry
-  → gcloud run deploy
+  → gcloud run deploy --set-env-vars（GitHub Actions Secrets から注入）
 ```
+
+Cloud Run の環境変数（`STORAGE_PROXY_URL`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` 等）は GitHub Actions の `--set-env-vars` で渡す。GCP Secret Manager は使用しない。
 
 ### 9.3 Docker マルチステージビルド
 
@@ -735,7 +737,7 @@ CMD ["media-processor"]
 ### 9.4 Workers デプロイフロー
 
 ```
-push to main (packages/media-cache/**)
+push to main (packages/media-delivery/**)
   → pnpm install
   → wrangler deploy
 ```
@@ -746,7 +748,7 @@ push to main (packages/media-cache/**)
 
 | 責務                                                  | ツール                               | タイミング                        |
 | ----------------------------------------------------- | ------------------------------------ | --------------------------------- |
-| GCP 初期構築 (AR, Cloud Run, SA, IAM, Secret Manager) | `gcloud` CLI                         | 初回のみ（セクション 5.3.2 参照） |
+| GCP 初期構築 (AR, Cloud Run, SA, IAM)                 | `gcloud` CLI                         | 初回のみ（セクション 5.3.2 参照） |
 | Cloudflare 初期構築 (Access, DNS, ドメイン)           | ダッシュボード                       | 初回のみ（セクション 5.3.3 参照） |
 | Cloud Run デプロイ (コンテナイメージ更新)             | GitHub Actions (`gcloud run deploy`) | main マージ時                     |
 | Workers デプロイ                                      | GitHub Actions (`wrangler deploy`)   | main マージ時                     |
@@ -755,7 +757,7 @@ push to main (packages/media-cache/**)
 
 ## 10. 環境変数
 
-### 10.1 Edge Cache Worker (`media-cache`)
+### 10.1 Edge Cache Worker (`media-delivery`)
 
 | 変数                      | 種別   | 説明                                                     |
 | ------------------------- | ------ | -------------------------------------------------------- |
@@ -842,9 +844,8 @@ push to main (packages/media-cache/**)
 
 1. Artifact Registry リポジトリ作成
 2. サービスアカウント作成 + `roles/run.invoker` 付与
-3. Secret Manager に CF Access クレデンシャルを格納
-4. Cloud Run サービスの初回デプロイ（`--no-allow-unauthenticated`）
-5. サービスアカウント鍵を発行し、Edge Cache Worker の Secret に設定
+3. Cloud Run サービスの初回デプロイ（`--no-allow-unauthenticated`）
+4. サービスアカウント鍵を発行し、Edge Cache Worker の Secret に設定
 
 ※ 手順の詳細はセクション 5.3.2 を参照
 
@@ -852,8 +853,8 @@ push to main (packages/media-cache/**)
 
 1. Storage Proxy Worker にカスタムドメイン設定
 2. Cloudflare Access アプリケーション + Service Auth ポリシー作成
-3. Service Token 発行 → GCP Secret Manager に格納
-4. Edge Cache Worker の作成（Service Binding + OIDC トークン生成）（`packages/media-cache`）
+3. Service Token 発行 → GitHub Actions Secrets に格納
+4. Edge Cache Worker の作成（Service Binding + OIDC トークン生成）（`packages/media-delivery`）
 
 ### Phase 3: Storage Proxy Worker 改修
 
