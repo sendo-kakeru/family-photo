@@ -11,5 +11,11 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
-  "routes": [{ "custom_domain": true, "pattern": "cdn.photo.sendo-app.com" }]
+  "routes": [{ "custom_domain": true, "pattern": "cdn.photo.sendo-app.com" }],
+  "services": [
+    {
+      "binding": "STORAGE_PROXY",
+      "service": "family-photo-storage-proxy"
+    }
+  ]
 }

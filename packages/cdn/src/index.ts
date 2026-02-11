@@ -7,6 +7,7 @@ type Env = {
   AUTH_SALT: string;
   ALLOW_EMAILS: string;
   MEDIA_PROCESSOR_URL: string;
+  STORAGE_PROXY: Service;
 };
 
 type HonoEnv = { Bindings: Env };
@@ -114,7 +115,8 @@ app.use("*", async (c, next) => {
 });
 
 const ALLOWED_FORMATS = new Set(["jpg", "jpeg", "png", "webp", "avif"]);
-const ALLOWED_EXTENSIONS = new Set([
+
+const IMAGE_EXTENSIONS = new Set([
   ".jpg",
   ".jpeg",
   ".png",
@@ -125,6 +127,19 @@ const ALLOWED_EXTENSIONS = new Set([
   ".tiff",
   ".tif",
 ]);
+const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".avi", ".webm", ".mkv"]);
+
+type MediaType = "image" | "video" | "other";
+
+// 拡張子からメディア種別を判定
+function getMediaType(key: string): MediaType {
+  const lastDot = key.lastIndexOf(".");
+  if (lastDot === -1) return "other";
+  const ext = key.substring(lastDot).toLowerCase();
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (VIDEO_EXTENSIONS.has(ext)) return "video";
+  return "other";
+}
 
 // オブジェクトキーのバリデーション（パストラバーサル防止）
 function validateKey(key: string): string | null {
@@ -149,16 +164,6 @@ function validateKey(key: string): string | null {
     decoded.includes("\\")
   ) {
     return "invalid key: path traversal detected";
-  }
-
-  // 拡張子チェック
-  const lastDot = decoded.lastIndexOf(".");
-  if (lastDot === -1) {
-    return "key must have a file extension";
-  }
-  const ext = decoded.substring(lastDot).toLowerCase();
-  if (!ALLOWED_EXTENSIONS.has(ext)) {
-    return `unsupported file extension '${ext}'`;
   }
 
   return null;
@@ -196,8 +201,8 @@ function validateQuery(query: Record<string, string>): string | null {
   return null;
 }
 
-// 画像配信エンドポイント
-app.get("/images/*", (c) => {
+// メディア配信エンドポイント
+app.get("/images/*", async (c) => {
   const key = c.req.path.replace(/^\/images\//, "");
 
   const keyError = validateKey(key);
@@ -205,14 +210,32 @@ app.get("/images/*", (c) => {
     return c.json({ error: keyError }, 400);
   }
 
-  const query = c.req.query();
-  const queryError = validateQuery(query);
-  if (queryError) {
-    return c.json({ error: queryError }, 400);
+  const mediaType = getMediaType(key);
+
+  if (mediaType === "image") {
+    // 画像 → クエリバリデーション → Cloud Run (Media Processor)
+    const query = c.req.query();
+    const queryError = validateQuery(query);
+    if (queryError) {
+      return c.json({ error: queryError }, 400);
+    }
+
+    const originUrl = new URL(`/transform/${key}`, c.env.MEDIA_PROCESSOR_URL);
+    originUrl.search = new URL(c.req.url).search;
+
+    // TODO: Cache API チェック (#219)
+    return fetch(originUrl, { headers: c.req.raw.headers });
   }
 
-  // TODO: Cache API チェック → Media Processor へのオリジンフェッチ (#218, #219)
-  return c.text("Not Implemented", 501);
+  // 動画/その他 → Storage Proxy (Service Binding)、変換パラメータは無視
+  const storageUrl = new URL(c.req.url);
+  storageUrl.pathname = `/${key}`;
+  storageUrl.search = "";
+
+  // TODO: Cache API チェック (#219)
+  return c.env.STORAGE_PROXY.fetch(
+    new Request(storageUrl, { headers: c.req.raw.headers }),
+  );
 });
 
 export default app;
