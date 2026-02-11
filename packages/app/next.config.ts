@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        hostname: "family-photo-cdn.sendokakeru-js.workers.dev",
+        hostname: "family-photo-storage-proxy.sendokakeru-js.workers.dev",
         protocol: "https",
       },
     ],

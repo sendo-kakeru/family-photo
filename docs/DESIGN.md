@@ -101,22 +101,50 @@ Backblaze B2
 
 | サービス      | ドメイン                      | 備考                                |
 | ------------- | ----------------------------- | ----------------------------------- |
-| Frontend      | `photo.sendo-app.com`         | Vercel にカスタムドメイン設定       |
-| Edge Cache    | `cdn.photo.sendo-app.com`     | Cloudflare Workers カスタムドメイン |
-| Storage Proxy | `storage.photo.sendo-app.com` | Cloudflare Access で保護            |
-| Cloud Run     | ドメイン割り当て不要          | Edge Cache Worker からのみアクセス  |
+| Frontend      | `photo.sendo-app.com`         | Vercel にカスタムドメイン設定                    |
+| Edge Cache    | `cdn.photo.sendo-app.com`     | Cloudflare Workers カスタムドメイン              |
+| Storage Proxy | `*.workers.dev`（デフォルト）  | カスタムドメイン不要。Cloudflare Access で保護   |
+| Cloud Run     | ドメイン割り当て不要          | Edge Cache Worker からのみアクセス               |
 
 ### 2.4 リソース命名
 
-| リソース              | 名前                         | 備考                                 |
-| --------------------- | ---------------------------- | ------------------------------------ |
-| Edge Cache Worker     | `media-delivery`                | Cloudflare Workers                   |
-| Storage Proxy Worker  | `family-photo-cdn`           | Cloudflare Workers（既存）           |
-| Cloud Run サービス    | `media-processor`            | GCP                                  |
-| Artifact Registry     | `media-processor`            | GCP                                  |
-| GCP Service Account   | `media-delivery-invoker`        | Edge Cache Worker → Cloud Run 認証用 |
-| CF Access Application | `family-photo-storage-proxy` | Storage Proxy 保護用                 |
-| B2 バケット           | `family-photo`               | 既存。メディア原本の保存先           |
+**命名方針:** Cloudflare Workers は実験用アカウント内で他プロジェクトと共存するため `family-photo-` プレフィックスを付与する。GCP リソースはプロジェクト単位で分離されるためプレフィックス不要。ローカル（パッケージディレクトリ・package.json・ワークフロー）はプロジェクト内で識別可能な短い名前を使用する。
+
+#### 2.4.1 Cloudflare リソース
+
+| リソース             | リソース名                     |
+| -------------------- | ------------------------------ |
+| Edge Cache Worker    | `family-photo-cdn`             |
+| Storage Proxy Worker | `family-photo-storage-proxy`   |
+
+**Cloudflare Access（セキュリティポリシー。Worker ではない）:**
+
+| 設定                 | 名前                           | 用途                                 |
+| -------------------- | ------------------------------ | ------------------------------------ |
+| Access Application   | `family-photo-storage-proxy`   | Storage Proxy のドメインを保護       |
+
+#### 2.4.2 GCP リソース
+
+| リソース           | リソース名               |
+| ------------------ | ------------------------ |
+| Cloud Run サービス | `media-processor`        |
+| Artifact Registry  | `media-processor`        |
+| Service Account    | `media-delivery-invoker` |
+
+#### 2.4.3 その他
+
+| リソース    | リソース名      | プラットフォーム |
+| ----------- | --------------- | ---------------- |
+| B2 バケット | `family-photo`  | Backblaze        |
+
+#### 2.4.4 ローカル命名（パッケージ / ワークフロー）
+
+| コンポーネント   | パッケージディレクトリ     | package.json `name`  | ワークフローファイル         |
+| ---------------- | -------------------------- | -------------------- | ---------------------------- |
+| Frontend         | `packages/app/`            | `@repo/app`          | —（Vercel 自動デプロイ）     |
+| Edge Cache       | `packages/cdn/`            | `@repo/cdn`          | `deploy-cdn.yml`             |
+| Storage Proxy    | `packages/storage-proxy/`  | `@repo/storage-proxy`| `deploy-storage-proxy.yml`   |
+| Media Processor  | `packages/media-processor/`| —（Cargo.toml）      | `deploy-media-processor.yml` |
 
 ---
 
@@ -212,7 +240,7 @@ GET /health
 
 ### 3.3 Storage Proxy Worker（内部エンドポイント）
 
-既存の `family-photo-cdn` Worker を踏襲。
+既存の `family-photo-storage-proxy` Worker を踏襲。
 
 - **Edge Cache Worker から:** Cloudflare Service Binding 経由（内部通信、認証不要）
 - **Cloud Run から:** Cloudflare Access Service Token 経由（エッジで認証）
@@ -340,7 +368,7 @@ export const { handlers, auth } = NextAuth({
 
 - `Domain=.photo.sendo-app.com` を設定すると、`photo.sendo-app.com` および `cdn.photo.sendo-app.com` 等の全サブドメインに Cookie が送信される
 - 開発環境 (`localhost`) では Domain を設定しない（localhost では Domain 属性不要）
-- **現行 CDN Worker との差異:** 現行の CDN Worker (`family-photo-cdn`) は `Authorization: Bearer` ヘッダでトークンを受け取る方式。フロントエンドの `/api/optimize` が Cookie からトークンを取り出して Bearer ヘッダに変換していた。新しい Edge Cache Worker はブラウザから直接アクセスされるため、Cookie から直接 JWT を読み取る方式に変更する
+- **現行 CDN Worker との差異:** 現行の CDN Worker (`family-photo-storage-proxy`) は `Authorization: Bearer` ヘッダでトークンを受け取る方式。フロントエンドの `/api/optimize` が Cookie からトークンを取り出して Bearer ヘッダに変換していた。新しい Edge Cache Worker はブラウザから直接アクセスされるため、Cookie から直接 JWT を読み取る方式に変更する
 
 Edge Cache Worker は next-auth の JWT を検証し、`ALLOW_EMAILS` に含まれるユーザーのみアクセスを許可する。
 
@@ -348,11 +376,11 @@ Edge Cache Worker は next-auth の JWT を検証し、`ALLOW_EMAILS` に含ま�
 
 同一 Cloudflare アカウント内の Worker 間通信。パブリックインターネットを経由せず、認証設定も不要。
 
-**wrangler.jsonc（media-delivery）:**
+**wrangler.jsonc（family-photo-cdn）:**
 
 ```jsonc
 {
-  "services": [{ "binding": "STORAGE_PROXY", "service": "family-photo-cdn" }],
+  "services": [{ "binding": "STORAGE_PROXY", "service": "family-photo-storage-proxy" }],
 }
 ```
 
@@ -570,7 +598,7 @@ gcloud run deploy media-processor \
   --min-instances=0 \
   --max-instances=4 \
   --timeout=300 \
-  --set-env-vars="STORAGE_PROXY_URL=https://storage.photo.sendo-app.com,PORT=8080" \
+  --set-env-vars="STORAGE_PROXY_URL=https://family-photo-storage-proxy.<account>.workers.dev,PORT=8080" \
   --project=${PROJECT_ID}
 
 # 4. サービスアカウントに Cloud Run 呼び出し権限を付与
@@ -593,9 +621,8 @@ Cloudflare ダッシュボードで以下を設定する。
 
 | 設定項目                      | 操作場所                                                | 内容                                              |
 | ----------------------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| Edge Cache Worker ドメイン    | Workers & Pages > media-delivery > Settings > Domains      | `cdn.photo.sendo-app.com`                         |
-| Storage Proxy Worker ドメイン | Workers & Pages > family-photo-cdn > Settings > Domains | `storage.photo.sendo-app.com`                     |
-| Access Application            | Zero Trust > Access > Applications                      | Storage Proxy のドメインに Self-hosted App を作成 |
+| Edge Cache Worker ドメイン    | Workers & Pages > family-photo-cdn > Settings > Domains | `cdn.photo.sendo-app.com`                               |
+| Access Application            | Zero Trust > Access > Applications                      | Storage Proxy の workers.dev ドメインに Self-hosted App を作成 |
 | Access Policy                 | 同上 > Policies                                         | Action: Service Auth, Service Token を指定        |
 | Service Token                 | Zero Trust > Access > Service Auth > Service Tokens     | Cloud Run 用の Service Token を発行               |
 
@@ -614,14 +641,14 @@ Cloudflare ダッシュボードで以下を設定する。
 family-photo/
 ├── packages/
 │   ├── app/                          # Next.js Frontend (Vercel) ※既存
-│   ├── media-delivery/                  # Edge Cache Worker (Hono) ※新規
-│   ├── cdn/                          # Storage Proxy Worker (Hono) ※既存・改修
+│   ├── cdn/                          # Edge Cache Worker (Hono) ※新規
+│   ├── storage-proxy/                # Storage Proxy Worker (Hono) ※既存 cdn/ からリネーム
 │   └── media-processor/              # Cloud Run (Rust / Axum) ※新規
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                    # ※既存
-│   │   ├── deploy-cdn-prod.yml       # Storage Proxy ※既存
-│   │   ├── deploy-media-delivery.yml    # Edge Cache Worker ※新規
+│   │   ├── deploy-storage-proxy.yml  # Storage Proxy ※既存 deploy-cdn-prod.yml からリネーム
+│   │   ├── deploy-cdn.yml       # Edge Cache Worker ※新規
 │   │   └── deploy-media-processor.yml # Cloud Run ※新規
 │   └── actions/
 │       └── setup-pnpm/              # ※既存
@@ -637,8 +664,8 @@ family-photo/
 | パッケージ        | 言語       | ランタイム         | 説明                            |
 | ----------------- | ---------- | ------------------ | ------------------------------- |
 | `app`             | TypeScript | Node.js (Vercel)   | フロントエンド・管理 API        |
-| `media-delivery`     | TypeScript | Cloudflare Workers | キャッシュ・認証・プロキシ      |
-| `cdn`             | TypeScript | Cloudflare Workers | B2 署名付きプロキシ（既存改修） |
+| `cdn`             | TypeScript | Cloudflare Workers | キャッシュ・認証・プロキシ      |
+| `storage-proxy`   | TypeScript | Cloudflare Workers | B2 署名付きプロキシ（既存改修） |
 | `media-processor` | Rust       | Cloud Run (Docker) | メディア変換処理                |
 
 ---
@@ -704,10 +731,10 @@ Cloudflare Cache API `cache.delete()` で個別パージ可能。将来的に管
 
 | ワークフロー                 | トリガー               | 対象パス                      |
 | ---------------------------- | ---------------------- | ----------------------------- |
-| `ci.yml`                     | push / PR (全ブランチ) | `**/*`                        |
-| `deploy-cdn-prod.yml`        | push to `main`         | `packages/cdn/**`             |
-| `deploy-media-delivery.yml`     | push to `main`         | `packages/media-delivery/**`     |
-| `deploy-media-processor.yml` | push to `main`         | `packages/media-processor/**` |
+| `ci.yml`                     | push / PR (全ブランチ) | `**/*`                           |
+| `deploy-storage-proxy.yml`   | push to `main`         | `packages/storage-proxy/**`      |
+| `deploy-cdn.yml`        | push to `main`         | `packages/cdn/**`           |
+| `deploy-media-processor.yml` | push to `main`         | `packages/media-processor/**`    |
 
 ### 9.2 Cloud Run デプロイフロー
 
@@ -737,7 +764,7 @@ CMD ["media-processor"]
 ### 9.4 Workers デプロイフロー
 
 ```
-push to main (packages/media-delivery/**)
+push to main (packages/cdn/** or packages/storage-proxy/**)
   → pnpm install
   → wrangler deploy
 ```
@@ -757,7 +784,7 @@ push to main (packages/media-delivery/**)
 
 ## 10. 環境変数
 
-### 10.1 Edge Cache Worker (`media-delivery`)
+### 10.1 Edge Cache Worker (`family-photo-cdn`)
 
 | 変数                      | 種別   | 説明                                                     |
 | ------------------------- | ------ | -------------------------------------------------------- |
@@ -771,7 +798,7 @@ push to main (packages/media-delivery/**)
 
 ```jsonc
 {
-  "services": [{ "binding": "STORAGE_PROXY", "service": "family-photo-cdn" }],
+  "services": [{ "binding": "STORAGE_PROXY", "service": "family-photo-storage-proxy" }],
 }
 ```
 
@@ -789,7 +816,7 @@ push to main (packages/media-delivery/**)
 - Cloud Run サービスは `--no-allow-unauthenticated` で作成
 - Edge Cache Worker 用 GCP サービスアカウントに `roles/run.invoker` を付与
 
-### 10.3 Storage Proxy Worker (`cdn`)
+### 10.3 Storage Proxy Worker (`storage-proxy`)
 
 | 変数                    | 種別   | 説明                                            |
 | ----------------------- | ------ | ----------------------------------------------- |
@@ -854,7 +881,7 @@ push to main (packages/media-delivery/**)
 1. Storage Proxy Worker にカスタムドメイン設定
 2. Cloudflare Access アプリケーション + Service Auth ポリシー作成
 3. Service Token 発行 → GitHub Actions Secrets に格納
-4. Edge Cache Worker の作成（Service Binding + OIDC トークン生成）（`packages/media-delivery`）
+4. Edge Cache Worker の作成（Service Binding + OIDC トークン生成）（`packages/cdn`）
 
 ### Phase 3: Storage Proxy Worker 改修
 

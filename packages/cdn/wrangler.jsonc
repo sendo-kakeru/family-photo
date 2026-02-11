@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "compatibility_date": "2025-10-21",
   "main": "src/index.ts",
-  "name": "family-photo-cdn",
+  "name": "family-photo-storage-proxy",
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
@@ -29,12 +29,6 @@
   // "ai": {
   //   "binding": "AI"
   // },
-  "routes": [
-    {
-      "custom_domain": true,
-      "pattern": "storage.photo.sendo-app.com"
-    }
-  ],
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
