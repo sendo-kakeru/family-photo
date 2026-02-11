@@ -3,6 +3,10 @@
   "compatibility_date": "2025-10-21",
   "main": "src/index.ts",
   "name": "family-photo-cdn",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
@@ -25,10 +29,12 @@
   // "ai": {
   //   "binding": "AI"
   // },
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  },
+  "routes": [
+    {
+      "custom_domain": true,
+      "pattern": "storage.photo.sendo-app.com"
+    }
+  ],
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
