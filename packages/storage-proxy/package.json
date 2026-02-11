@@ -1,11 +1,12 @@
 {
   "dependencies": {
-    "hono": "^4.11.9"
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.11.7"
   },
   "devDependencies": {
-    "wrangler": "^4.4.0"
+    "wrangler": "^4.63.0"
   },
-  "name": "@repo/cdn",
+  "name": "@repo/storage-proxy",
   "scripts": {
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "deploy": "wrangler deploy --minify",

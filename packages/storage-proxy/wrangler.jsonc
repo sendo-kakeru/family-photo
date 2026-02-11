@@ -1,14 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "compatibility_date": "2026-02-11",
+  "compatibility_date": "2025-10-21",
   "main": "src/index.ts",
-  "name": "family-photo-cdn",
-  // "compatibility_flags": [
-  //   "nodejs_compat"
-  // ],
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
+  "name": "family-photo-storage-proxy",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
@@ -31,9 +29,13 @@
   // "ai": {
   //   "binding": "AI"
   // },
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  },
-  "routes": [{ "custom_domain": true, "pattern": "cdn.photo.sendo-app.com" }]
+  // "compatibility_flags": [
+  //   "nodejs_compat"
+  // ],
+  "vars": {
+    "ALLOW_LIST_BUCKET": false,
+    "B2_ENDPOINT": "s3.us-west-004.backblazeb2.com",
+    "BUCKET_NAME": "family-photo",
+    "RCLONE_DOWNLOAD": true
+  }
 }

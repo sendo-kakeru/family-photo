@@ -1,4 +1,4 @@
-name: Deploy CDN Production
+name: Deploy CDN
 on:
   push:
     branches:
