@@ -7,6 +7,7 @@ type Env = {
   AUTH_SALT: string;
   ALLOW_EMAILS: string;
   MEDIA_PROCESSOR_URL: string;
+  GCP_SERVICE_ACCOUNT_KEY: string;
   STORAGE_PROXY: Service;
 };
 
@@ -17,6 +18,16 @@ const app = new Hono<HonoEnv>();
 // Workers グローバルキャッシュ（インスタンスのライフサイクル全体で保持）
 let cachedKey: { secret: string; salt: string; key: Uint8Array } | null = null;
 let cachedAllowEmails: { raw: string; emails: Set<string> } | null = null;
+let cachedCryptoKey: {
+  keyId: string;
+  key: CryptoKey;
+  clientEmail: string;
+} | null = null;
+let cachedOidcToken: {
+  audience: string;
+  token: string;
+  expiresAt: number;
+} | null = null;
 
 // next-auth (Auth.js v5) の暗号化鍵を HKDF で導出する（キャッシュ付き）
 async function getDerivedEncryptionKey(
@@ -50,6 +61,82 @@ async function getDerivedEncryptionKey(
   const key = new Uint8Array(derivedBits);
   cachedKey = { key, salt, secret };
   return key;
+}
+
+// GCP サービスアカウント秘密鍵から OIDC トークンを取得する（キャッシュ付き）
+async function getOidcToken(
+  saKeyJson: string,
+  audience: string,
+): Promise<string> {
+  // キャッシュチェック（有効期限の5分前にリフレッシュ）
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    cachedOidcToken &&
+    cachedOidcToken.audience === audience &&
+    cachedOidcToken.expiresAt > now + 300
+  ) {
+    return cachedOidcToken.token;
+  }
+
+  // サービスアカウント鍵をパースし CryptoKey をキャッシュ
+  const saKey: {
+    client_email: string;
+    private_key: string;
+    private_key_id: string;
+  } = JSON.parse(saKeyJson);
+
+  let cryptoKey: CryptoKey;
+  if (cachedCryptoKey?.keyId === saKey.private_key_id) {
+    cryptoKey = cachedCryptoKey.key;
+  } else {
+    cryptoKey = (await jose.importPKCS8(
+      saKey.private_key,
+      "RS256",
+    )) as CryptoKey;
+    cachedCryptoKey = {
+      clientEmail: saKey.client_email,
+      key: cryptoKey,
+      keyId: saKey.private_key_id,
+    };
+  }
+
+  // 自己署名 JWT を生成（RS256）
+  const jwt = await new jose.SignJWT({ target_audience: audience })
+    .setProtectedHeader({
+      alg: "RS256",
+      kid: saKey.private_key_id,
+      typ: "JWT",
+    })
+    .setIssuer(saKey.client_email)
+    .setSubject(saKey.client_email)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(cryptoKey);
+
+  // Google Token Endpoint で OIDC トークンに交換
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method: "POST",
+  });
+
+  if (!tokenResponse.ok) {
+    const errorText = await tokenResponse.text();
+    throw new Error(
+      `OIDC token exchange failed: ${tokenResponse.status} ${errorText}`,
+    );
+  }
+
+  const tokenData = (await tokenResponse.json()) as { id_token: string };
+
+  cachedOidcToken = {
+    audience,
+    expiresAt: now + 3600,
+    token: tokenData.id_token,
+  };
+
+  return tokenData.id_token;
 }
 
 // ALLOW_EMAILS を Set にパースする（キャッシュ付き）
@@ -223,8 +310,25 @@ app.get("/images/*", async (c) => {
     const originUrl = new URL(`/transform/${key}`, c.env.MEDIA_PROCESSOR_URL);
     originUrl.search = new URL(c.req.url).search;
 
-    // TODO: Cache API チェック (#219)
-    return fetch(originUrl, { headers: c.req.raw.headers });
+    let oidcToken: string;
+    try {
+      oidcToken = await getOidcToken(
+        c.env.GCP_SERVICE_ACCOUNT_KEY,
+        c.env.MEDIA_PROCESSOR_URL,
+      );
+    } catch (error) {
+      console.error(
+        "OIDC token generation failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+      return c.text("Bad Gateway", 502);
+    }
+
+    const headers = new Headers(c.req.raw.headers);
+    headers.set("Authorization", `Bearer ${oidcToken}`);
+
+    // TODO: Cache API チェック
+    return fetch(originUrl, { headers });
   }
 
   // 動画/その他 → Storage Proxy (Service Binding)、変換パラメータは無視
