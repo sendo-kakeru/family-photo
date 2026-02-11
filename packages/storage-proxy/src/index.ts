@@ -2,6 +2,7 @@ import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { etag } from "hono/etag";
+import * as jose from "jose";
 
 type Env = {
   BUCKET_NAME: string;
@@ -12,6 +13,8 @@ type Env = {
   RCLONE_DOWNLOAD?: string;
   ALLOWED_HEADERS?: string[];
   APP_HOST: string;
+  CF_ACCESS_TEAM_DOMAIN: string;
+  CF_ACCESS_AUD: string;
 };
 
 type HonoEnv = { Bindings: Env };
@@ -197,6 +200,30 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
 
   return fetchPromise;
 }
+// Cloudflare Access JWT 検証ミドルウェア（多層防御）
+// Service Binding 経由（Edge Cache Worker から）のリクエストにはヘッダが付かないためスキップ
+app.use("*", async (c, next) => {
+  const accessJwt = c.req.header("Cf-Access-Jwt-Assertion");
+  if (!accessJwt) {
+    // Service Binding 経由のリクエスト（JWT ヘッダなし）はそのまま通す
+    return next();
+  }
+
+  // Cloud Run 経由のリクエスト（パブリックインターネット経由）は JWT を検証
+  try {
+    const certsUrl = `https://${c.env.CF_ACCESS_TEAM_DOMAIN}.cloudflareaccess.com/cdn-cgi/access/certs`;
+    const JWKS = jose.createRemoteJWKSet(new URL(certsUrl));
+    await jose.jwtVerify(accessJwt, JWKS, {
+      audience: c.env.CF_ACCESS_AUD,
+    });
+  } catch (error) {
+    console.error("Cloudflare Access JWT verification failed:", error);
+    return c.text("Forbidden", 403);
+  }
+
+  return next();
+});
+
 app.use("*", async (c, next) => {
   const corsMiddleware = cors({
     allowHeaders: ["*"],
