@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "aws4fetch": "^1.0.20",
-    "hono": "^4.11.7"
+    "hono": "^4.11.9"
   },
   "devDependencies": {
     "wrangler": "^4.63.0"
