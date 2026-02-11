@@ -1,0 +1,11 @@
+{
+  "dependencies": {},
+  "devDependencies": {},
+  "name": "@repo/media-processor",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --release",
+    "dev": "cargo run"
+  },
+  "type": "module"
+}
