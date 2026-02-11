@@ -2,7 +2,6 @@ import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { etag } from "hono/etag";
-import { decode } from "next-auth/jwt";
 
 type Env = {
   BUCKET_NAME: string;
@@ -13,9 +12,6 @@ type Env = {
   RCLONE_DOWNLOAD?: string;
   ALLOWED_HEADERS?: string[];
   APP_HOST: string;
-  ALLOW_EMAILS: string;
-  AUTH_SECRET: string;
-  AUTH_SALT: string;
 };
 
 type HonoEnv = { Bindings: Env };
@@ -207,31 +203,6 @@ app.use("*", async (c, next) => {
     allowMethods: ["GET", "HEAD"],
     origin: [`https://${c.env.APP_HOST}`, "http://localhost:3000"],
   });
-
-  const ALLOW_EMAILS = new Set(
-    c.env.ALLOW_EMAILS?.split(",")
-      .map((split) => split.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  const authorizationHeader = c.req.header("Authorization");
-  if (!authorizationHeader || !authorizationHeader.startsWith("Bearer")) {
-    return c.text("Unauthorized", 401);
-  }
-  const token = authorizationHeader.split("Bearer")[1]?.trim();
-
-  try {
-    const decoded = await decode({
-      salt: c.env.AUTH_SALT,
-      secret: c.env.AUTH_SECRET,
-      token,
-    });
-    if (!decoded || !decoded.email) throw new Error("Invalid token");
-    if (!ALLOW_EMAILS.has(decoded.email.toLowerCase()))
-      throw new Error("Forbidden");
-  } catch (error) {
-    console.error("Authentication failed:", error);
-    return c.text("Forbidden", 403);
-  }
   return corsMiddleware(c, next);
 });
 app.get("*", (c) => handleProxy(c, "GET"));
