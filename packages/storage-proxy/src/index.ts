@@ -1,7 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
-import { etag } from "hono/etag";
 import * as jose from "jose";
 
 type Env = {
@@ -21,16 +20,19 @@ type HonoEnv = { Bindings: Env };
 
 const app = new Hono<HonoEnv>();
 
-// ETagミドルウェアを適用
-app.use("*", etag());
-
 // キャッシュヘッダーミドルウェア（メディアファイル用）
 app.use("*", async (c, next) => {
   await next();
 
+  // 304 Not Modified はヘッダを変更しない
+  if (c.res.status === 304) {
+    return;
+  }
+
   // メディアファイルには長期キャッシュを設定
   c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
   c.res.headers.set("Vary", "Accept-Encoding, Accept");
+  c.res.headers.set("Accept-Ranges", "bytes");
 
   // Last-Modifiedがない場合は設定
   if (!c.res.headers.has("Last-Modified")) {
@@ -42,11 +44,6 @@ const UNSIGNABLE_HEADERS = [
   "x-forwarded-proto",
   "x-real-ip",
   "accept-encoding",
-  "if-match",
-  "if-modified-since",
-  "if-none-match",
-  "if-range",
-  "if-unmodified-since",
 ];
 
 const HTTPS_PROTOCOL = "https:";
