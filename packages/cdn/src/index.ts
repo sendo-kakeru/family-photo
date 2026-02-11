@@ -113,4 +113,106 @@ app.use("*", async (c, next) => {
   return next();
 });
 
+const ALLOWED_FORMATS = new Set(["jpg", "jpeg", "png", "webp", "avif"]);
+const ALLOWED_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".avif",
+  ".gif",
+  ".bmp",
+  ".tiff",
+  ".tif",
+]);
+
+// オブジェクトキーのバリデーション（パストラバーサル防止）
+function validateKey(key: string): string | null {
+  if (!key) {
+    return "key is required";
+  }
+  if (key.length > 1024) {
+    return "key too long (max: 1024)";
+  }
+
+  const decoded = decodeURIComponent(key);
+
+  // ホワイトリスト: 英数字、スラッシュ、ハイフン、アンダースコア、ドットのみ
+  if (!/^[a-zA-Z0-9/\-_.]+$/.test(decoded)) {
+    return "key contains invalid characters";
+  }
+
+  if (
+    decoded.includes("..") ||
+    decoded.startsWith("/") ||
+    decoded.includes("//") ||
+    decoded.includes("\\")
+  ) {
+    return "invalid key: path traversal detected";
+  }
+
+  // 拡張子チェック
+  const lastDot = decoded.lastIndexOf(".");
+  if (lastDot === -1) {
+    return "key must have a file extension";
+  }
+  const ext = decoded.substring(lastDot).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return `unsupported file extension '${ext}'`;
+  }
+
+  return null;
+}
+
+// クエリパラメータのバリデーション
+function validateQuery(query: Record<string, string>): string | null {
+  if (query.w !== undefined) {
+    const w = Number(query.w);
+    if (!Number.isInteger(w) || w <= 0) {
+      return "w must be a positive integer";
+    }
+  }
+
+  if (query.h !== undefined) {
+    const h = Number(query.h);
+    if (!Number.isInteger(h) || h <= 0) {
+      return "h must be a positive integer";
+    }
+  }
+
+  if (query.f !== undefined) {
+    if (!ALLOWED_FORMATS.has(query.f.toLowerCase())) {
+      return `unsupported format '${query.f}'. supported: jpg, png, webp, avif`;
+    }
+  }
+
+  if (query.q !== undefined) {
+    const q = Number(query.q);
+    if (!Number.isInteger(q) || q < 1 || q > 100) {
+      return "q must be an integer between 1 and 100";
+    }
+  }
+
+  return null;
+}
+
+// 画像配信エンドポイント
+app.get("/images/*", (c) => {
+  const key = c.req.path.replace(/^\/images\//, "");
+
+  const keyError = validateKey(key);
+  if (keyError) {
+    return c.json({ error: keyError }, 400);
+  }
+
+  const query = c.req.query();
+  const queryError = validateQuery(query);
+  if (queryError) {
+    return c.json({ error: queryError }, 400);
+  }
+
+  // TODO: Cache API チェック → Media Processor へのオリジンフェッチ (#218, #219)
+  return c.text("Not Implemented", 501);
+});
+
 export default app;
