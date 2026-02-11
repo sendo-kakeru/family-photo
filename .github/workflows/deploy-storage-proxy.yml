@@ -1,4 +1,4 @@
-name: Deploy CDN Production
+name: Deploy Storage Proxy
 on:
   push:
     branches:
@@ -18,4 +18,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/cdn
+          workingDirectory: packages/storage-proxy

@@ -103,7 +103,7 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
-  packages/cdn:
+  packages/storage-proxy:
     dependencies:
       aws4fetch:
         specifier: ^1.0.20
