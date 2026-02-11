@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-02-11",
   "main": "src/index.ts",
-  "name": "cdn",
+  "name": "family-photo-cdn",
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
