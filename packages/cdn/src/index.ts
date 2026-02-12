@@ -237,7 +237,12 @@ function validateKey(key: string): string | null {
     return "key too long (max: 1024)";
   }
 
-  const decoded = decodeURIComponent(key);
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(key);
+  } catch {
+    return "key contains invalid encoding";
+  }
 
   // ホワイトリスト: 英数字、スラッシュ、ハイフン、アンダースコア、ドットのみ
   if (!/^[a-zA-Z0-9/\-_.]+$/.test(decoded)) {
@@ -288,6 +293,46 @@ function validateQuery(query: Record<string, string>): string | null {
   return null;
 }
 
+// 許可されたクエリパラメータのみでキャッシュキーを構築（キャッシュポイズニング防止）
+const TRANSFORM_PARAMS = ["w", "h", "f", "q"] as const;
+
+function buildCacheKey(url: string, download: boolean): Request {
+  const src = new URL(url);
+  const cacheUrl = new URL(src.origin + src.pathname);
+  if (download) {
+    cacheUrl.searchParams.set("download", "true");
+  } else {
+    for (const param of TRANSFORM_PARAMS) {
+      const value = src.searchParams.get(param);
+      if (value === null) continue;
+      // 正規化: 数値パラメータは Number() で、f は小文字化
+      const normalized =
+        param === "f" ? value.toLowerCase() : String(Number(value));
+      cacheUrl.searchParams.set(param, normalized);
+    }
+  }
+  return new Request(cacheUrl);
+}
+
+// Storage Proxy からオリジナルファイルを取得
+function fetchFromStorageProxy(
+  storageProxy: Service,
+  url: string,
+  key: string,
+  headers: Headers,
+): Promise<Response> {
+  const storageUrl = new URL(url);
+  storageUrl.pathname = `/${key}`;
+  storageUrl.search = "";
+  return storageProxy.fetch(new Request(storageUrl, { headers }));
+}
+
+// ファイル名をサニタイズ（CRLF injection 防止）
+function sanitizeFilename(key: string): string {
+  const raw = key.split("/").pop() || key;
+  return raw.replace(/[\r\n"]/g, "_");
+}
+
 // メディア配信エンドポイント
 app.get("/images/*", async (c) => {
   const key = c.req.path.replace(/^\/images\//, "");
@@ -297,18 +342,42 @@ app.get("/images/*", async (c) => {
     return c.json({ error: keyError }, 400);
   }
 
+  const query = c.req.query();
+  const download = query.download === "true";
   const mediaType = getMediaType(key);
 
-  if (mediaType === "image") {
+  const cacheKey = buildCacheKey(c.req.url, download);
+  const cache = caches.default;
+
+  // Cache HIT チェック
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) {
+    const response = new Response(cachedResponse.body, cachedResponse);
+    response.headers.set("X-Cache", "HIT");
+    return response;
+  }
+
+  // Cache MISS → オリジンフェッチ
+  let originResponse: Response;
+
+  if (download) {
+    // download=true → Storage Proxy からオリジナルを取得
+    originResponse = await fetchFromStorageProxy(
+      c.env.STORAGE_PROXY,
+      c.req.url,
+      key,
+      c.req.raw.headers,
+    );
+  } else if (mediaType === "image") {
     // 画像 → クエリバリデーション → Cloud Run (Media Processor)
-    const query = c.req.query();
     const queryError = validateQuery(query);
     if (queryError) {
       return c.json({ error: queryError }, 400);
     }
 
     const originUrl = new URL(`/transform/${key}`, c.env.MEDIA_PROCESSOR_URL);
-    originUrl.search = new URL(c.req.url).search;
+    const cacheKeyUrl = new URL(cacheKey.url);
+    originUrl.search = cacheKeyUrl.search;
 
     let oidcToken: string;
     try {
@@ -327,19 +396,45 @@ app.get("/images/*", async (c) => {
     const headers = new Headers(c.req.raw.headers);
     headers.set("Authorization", `Bearer ${oidcToken}`);
 
-    // TODO: Cache API チェック
-    return fetch(originUrl, { headers });
+    originResponse = await fetch(originUrl, { headers });
+  } else {
+    // 動画/その他 → Storage Proxy (Service Binding)
+    originResponse = await fetchFromStorageProxy(
+      c.env.STORAGE_PROXY,
+      c.req.url,
+      key,
+      c.req.raw.headers,
+    );
   }
 
-  // 動画/その他 → Storage Proxy (Service Binding)、変換パラメータは無視
-  const storageUrl = new URL(c.req.url);
-  storageUrl.pathname = `/${key}`;
-  storageUrl.search = "";
+  // エラーレスポンスはキャッシュしない
+  if (!originResponse.ok) {
+    return originResponse;
+  }
 
-  // TODO: Cache API チェック (#219)
-  return c.env.STORAGE_PROXY.fetch(
-    new Request(storageUrl, { headers: c.req.raw.headers }),
-  );
+  // キャッシュ用レスポンスを構築
+  const responseHeaders = new Headers(originResponse.headers);
+  responseHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
+  if (download) {
+    const filename = sanitizeFilename(key);
+    responseHeaders.set(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`,
+    );
+  }
+
+  const cacheableResponse = new Response(originResponse.body, {
+    headers: responseHeaders,
+    status: originResponse.status,
+  });
+
+  // キャッシュ保存（レスポンス返却をブロックしない）
+  c.executionCtx.waitUntil(cache.put(cacheKey, cacheableResponse.clone()));
+
+  // クライアントへのレスポンス
+  cacheableResponse.headers.set("X-Cache", "MISS");
+
+  return cacheableResponse;
 });
 
 export default app;
