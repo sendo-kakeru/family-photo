@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import * as jose from "jose";
 
@@ -333,8 +333,8 @@ function sanitizeFilename(key: string): string {
   return raw.replace(/[\r\n"]/g, "_");
 }
 
-// メディア配信エンドポイント
-app.get("/images/*", async (c) => {
+// メディア配信ハンドラ
+async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
   const key = c.req.path.replace(/^\/images\//, "");
 
   const keyError = validateKey(key);
@@ -435,6 +435,18 @@ app.get("/images/*", async (c) => {
   cacheableResponse.headers.set("X-Cache", "MISS");
 
   return cacheableResponse;
+}
+
+// GET: ボディ付きレスポンス
+app.get("/images/*", handleMedia);
+
+// HEAD: ヘッダのみ返却（キャッシュプライミングあり）
+app.on("HEAD", "/images/*", async (c) => {
+  const response = await handleMedia(c);
+  return new Response(null, {
+    headers: response.headers,
+    status: response.status,
+  });
 });
 
 export default app;
