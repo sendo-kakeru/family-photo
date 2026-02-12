@@ -1,5 +1,6 @@
 import { type Context, Hono } from "hono";
 import { getCookie } from "hono/cookie";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import * as jose from "jose";
 
 type Env = {
@@ -168,7 +169,7 @@ app.use("*", async (c, next) => {
     getCookie(c, "authjs.session-token");
 
   if (!token) {
-    return c.text("Unauthorized", 401);
+    return c.json({ error: "認証に失敗しました" }, 401);
   }
 
   let email: string;
@@ -182,25 +183,26 @@ app.use("*", async (c, next) => {
     });
 
     if (typeof payload.email !== "string" || !payload.email) {
-      return c.text("Unauthorized", 401);
+      return c.json({ error: "認証に失敗しました" }, 401);
     }
     email = payload.email;
   } catch (error) {
     console.error(
       "JWT verification failed:",
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error.name : "UnknownError",
     );
-    return c.text("Unauthorized", 401);
+    return c.json({ error: "認証に失敗しました" }, 401);
   }
 
   const allowEmails = getAllowEmails(c.env.ALLOW_EMAILS);
   if (!allowEmails.has(email.toLowerCase())) {
-    return c.text("Unauthorized", 401);
+    return c.json({ error: "認証に失敗しました" }, 401);
   }
 
   return next();
 });
 
+const MEDIA_PROCESSOR_TIMEOUT_MS = 30_000;
 const ALLOWED_FORMATS = new Set(["jpg", "jpeg", "png", "webp", "avif"]);
 
 const IMAGE_EXTENSIONS = new Set([
@@ -231,22 +233,22 @@ function getMediaType(key: string): MediaType {
 // オブジェクトキーのバリデーション（パストラバーサル防止）
 function validateKey(key: string): string | null {
   if (!key) {
-    return "key is required";
+    return "キーが指定されていません";
   }
   if (key.length > 1024) {
-    return "key too long (max: 1024)";
+    return "キーが長すぎます（最大: 1024文字）";
   }
 
   let decoded: string;
   try {
     decoded = decodeURIComponent(key);
   } catch {
-    return "key contains invalid encoding";
+    return "キーに不正なエンコーディングが含まれています";
   }
 
   // ホワイトリスト: 英数字、スラッシュ、ハイフン、アンダースコア、ドットのみ
   if (!/^[a-zA-Z0-9/\-_.]+$/.test(decoded)) {
-    return "key contains invalid characters";
+    return "キーに使用できない文字が含まれています";
   }
 
   if (
@@ -255,7 +257,7 @@ function validateKey(key: string): string | null {
     decoded.includes("//") ||
     decoded.includes("\\")
   ) {
-    return "invalid key: path traversal detected";
+    return "不正なキー: パストラバーサルが検出されました";
   }
 
   return null;
@@ -266,27 +268,27 @@ function validateQuery(query: Record<string, string>): string | null {
   if (query.w !== undefined) {
     const w = Number(query.w);
     if (!Number.isInteger(w) || w <= 0) {
-      return "w must be a positive integer";
+      return "w は正の整数で指定してください";
     }
   }
 
   if (query.h !== undefined) {
     const h = Number(query.h);
     if (!Number.isInteger(h) || h <= 0) {
-      return "h must be a positive integer";
+      return "h は正の整数で指定してください";
     }
   }
 
   if (query.f !== undefined) {
     if (!ALLOWED_FORMATS.has(query.f.toLowerCase())) {
-      return `unsupported format '${query.f}'. supported: jpg, png, webp, avif`;
+      return "サポートされていないフォーマットです（対応: jpg, png, webp, avif）";
     }
   }
 
   if (query.q !== undefined) {
     const q = Number(query.q);
     if (!Number.isInteger(q) || q < 1 || q > 100) {
-      return "q must be an integer between 1 and 100";
+      return "q は 1〜100 の整数で指定してください";
     }
   }
 
@@ -325,6 +327,27 @@ function fetchFromStorageProxy(
   storageUrl.pathname = `/${key}`;
   storageUrl.search = "";
   return storageProxy.fetch(new Request(storageUrl, { headers }));
+}
+
+// オリジンエラーレスポンスを適切な CDN エラーにマッピング
+function mapOriginError(status: number): { message: string; status: number } {
+  switch (status) {
+    case 404:
+      return { message: "指定されたメディアが見つかりません", status: 404 };
+    case 422:
+      return { message: "メディアの変換に失敗しました", status: 422 };
+    case 500:
+      return {
+        message: "メディアの取得に失敗しました",
+        status: 502,
+      };
+    default:
+      console.error(`Unexpected origin status: ${status}`);
+      return {
+        message: "メディアの取得に失敗しました",
+        status: 502,
+      };
+  }
 }
 
 // ファイル名をサニタイズ（CRLF injection 防止）
@@ -388,15 +411,29 @@ async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
     } catch (error) {
       console.error(
         "OIDC token generation failed:",
-        error instanceof Error ? error.message : String(error),
+        error instanceof Error ? error.name : "UnknownError",
       );
-      return c.text("Bad Gateway", 502);
+      return c.json({ error: "メディアの取得に失敗しました" }, 502);
     }
 
     const headers = new Headers(c.req.raw.headers);
     headers.set("Authorization", `Bearer ${oidcToken}`);
 
-    originResponse = await fetch(originUrl, { headers });
+    try {
+      originResponse = await fetch(originUrl, {
+        headers,
+        signal: AbortSignal.timeout(MEDIA_PROCESSOR_TIMEOUT_MS),
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        return c.json({ error: "メディアの処理がタイムアウトしました" }, 504);
+      }
+      console.error(
+        "Media processor fetch failed:",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+      return c.json({ error: "メディアの取得に失敗しました" }, 502);
+    }
   } else {
     // 動画/その他 → Storage Proxy (Service Binding)
     originResponse = await fetchFromStorageProxy(
@@ -409,7 +446,8 @@ async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
 
   // エラーレスポンスはキャッシュしない
   if (!originResponse.ok) {
-    return originResponse;
+    const { message, status } = mapOriginError(originResponse.status);
+    return c.json({ error: message }, status as ContentfulStatusCode);
   }
 
   // キャッシュ用レスポンスを構築
