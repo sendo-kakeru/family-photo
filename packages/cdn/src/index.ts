@@ -8,8 +8,9 @@ type Env = {
   AUTH_SALT: string;
   ALLOW_EMAILS: string;
   MEDIA_PROCESSOR_URL: string;
-  GCP_SERVICE_ACCOUNT_KEY: string;
+  GCP_SERVICE_ACCOUNT_KEY?: string;
   STORAGE_PROXY: Service;
+  STORAGE_PROXY_URL?: string;
 };
 
 type HonoEnv = { Bindings: Env };
@@ -51,7 +52,7 @@ async function getDerivedEncryptionKey(
   const derivedBits = await crypto.subtle.deriveBits(
     {
       hash: "SHA-256",
-      info: encoder.encode("Auth.js Generated Encryption Key"),
+      info: encoder.encode(`Auth.js Generated Encryption Key (${salt})`),
       name: "HKDF",
       salt: encoder.encode(salt),
     },
@@ -317,16 +318,28 @@ function buildCacheKey(url: string, download: boolean): Request {
 }
 
 // Storage Proxy からオリジナルファイルを取得
+// ブラウザヘッダー（cookie, sec-fetch-* 等）を転送すると B2 の署名検証が失敗するため、Range ヘッダーのみ転送する
+// STORAGE_PROXY_URL が設定されている場合は直接 HTTP（ローカル開発用）
 function fetchFromStorageProxy(
-  storageProxy: Service,
+  env: Env,
   url: string,
   key: string,
   headers: Headers,
 ): Promise<Response> {
+  const proxyHeaders = new Headers();
+  const range = headers.get("Range");
+  if (range) proxyHeaders.set("Range", range);
+
+  if (env.STORAGE_PROXY_URL) {
+    const directUrl = new URL(`/${key}`, env.STORAGE_PROXY_URL);
+    return fetch(directUrl, { headers: proxyHeaders });
+  }
   const storageUrl = new URL(url);
   storageUrl.pathname = `/${key}`;
   storageUrl.search = "";
-  return storageProxy.fetch(new Request(storageUrl, { headers }));
+  return env.STORAGE_PROXY.fetch(
+    new Request(storageUrl, { headers: proxyHeaders }),
+  );
 }
 
 // オリジンエラーレスポンスを適切な CDN エラーにマッピング
@@ -386,7 +399,7 @@ async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
   if (download) {
     // download=true → Storage Proxy からオリジナルを取得
     originResponse = await fetchFromStorageProxy(
-      c.env.STORAGE_PROXY,
+      c.env,
       c.req.url,
       key,
       c.req.raw.headers,
@@ -402,22 +415,26 @@ async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
     const cacheKeyUrl = new URL(cacheKey.url);
     originUrl.search = cacheKeyUrl.search;
 
-    let oidcToken: string;
-    try {
-      oidcToken = await getOidcToken(
-        c.env.GCP_SERVICE_ACCOUNT_KEY,
-        c.env.MEDIA_PROCESSOR_URL,
-      );
-    } catch (error) {
-      console.error(
-        "OIDC token generation failed:",
-        error instanceof Error ? error.name : "UnknownError",
-      );
-      return c.json({ error: "メディアの取得に失敗しました" }, 502);
-    }
-
     const headers = new Headers(c.req.raw.headers);
-    headers.set("Authorization", `Bearer ${oidcToken}`);
+
+    // GCP_SERVICE_ACCOUNT_KEY が設定されている場合のみ OIDC トークンを付与
+    // ローカル開発では media-processor に認証なしでアクセスする
+    if (c.env.GCP_SERVICE_ACCOUNT_KEY) {
+      let oidcToken: string;
+      try {
+        oidcToken = await getOidcToken(
+          c.env.GCP_SERVICE_ACCOUNT_KEY,
+          c.env.MEDIA_PROCESSOR_URL,
+        );
+      } catch (error) {
+        console.error(
+          "OIDC token generation failed:",
+          error instanceof Error ? error.name : "UnknownError",
+        );
+        return c.json({ error: "メディアの取得に失敗しました" }, 502);
+      }
+      headers.set("Authorization", `Bearer ${oidcToken}`);
+    }
 
     try {
       originResponse = await fetch(originUrl, {
@@ -437,7 +454,7 @@ async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
   } else {
     // 動画/その他 → Storage Proxy (Service Binding)
     originResponse = await fetchFromStorageProxy(
-      c.env.STORAGE_PROXY,
+      c.env,
       c.req.url,
       key,
       c.req.raw.headers,
@@ -446,6 +463,10 @@ async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
 
   // エラーレスポンスはキャッシュしない
   if (!originResponse.ok) {
+    const originBody = await originResponse.text().catch(() => "(read failed)");
+    console.error(
+      `Origin error: status=${originResponse.status} key=${key} body=${originBody}`,
+    );
     const { message, status } = mapOriginError(originResponse.status);
     return c.json({ error: message }, status as ContentfulStatusCode);
   }

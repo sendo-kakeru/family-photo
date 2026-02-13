@@ -147,9 +147,8 @@ export default function MediaModal({
                 "max-h-full max-w-full object-contain transition-opacity duration-300",
                 imageLoading ? "opacity-0" : "opacity-100",
               )}
-              height={800}
+              format="webp"
               onLoad={() => setImageLoading(false)}
-              original
               src={mediaUrl}
               width={800}
             />

@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use exif::{In, Tag};
 use fast_image_resize::images::Image;
 use fast_image_resize::{PixelType, ResizeAlg, ResizeOptions, Resizer};
 use image::codecs::avif::AvifEncoder;
@@ -79,7 +80,11 @@ pub fn transform(
 ) -> Result<(Bytes, &'static str), TransformError> {
     validate_params(params)?;
 
+    let orientation = read_exif_orientation(input);
     let (img, source_format) = decode_image(input)?;
+
+    // EXIF Orientation を適用（メタデータは再エンコードで除去されるため、ピクセルを回転）
+    let img = apply_orientation(img, orientation);
     let (src_w, src_h) = (img.width(), img.height());
 
     validate_source_dimensions(src_w, src_h)?;
@@ -100,20 +105,8 @@ pub fn transform(
 
     let output_format = determine_output_format(source_format, params.format);
 
-    // PNG/WebP では quality パラメータを拒否（ロスレス固定のため）
-    let quality = match output_format {
-        OutputFormat::Png | OutputFormat::WebP => {
-            if params.quality.is_some() {
-                return Err(TransformError::InvalidParams(format!(
-                    "quality parameter is not supported for {output_format:?} (lossless only)"
-                )));
-            }
-            DEFAULT_QUALITY
-        }
-        _ => params.quality.unwrap_or(DEFAULT_QUALITY),
-    };
-
     let content_type = output_format.content_type();
+    let quality = params.quality.unwrap_or(DEFAULT_QUALITY);
     let output_bytes = encode_image(&resized, output_format, quality)?;
 
     Ok((Bytes::from(output_bytes), content_type))
@@ -132,6 +125,30 @@ fn decode_image(input: &Bytes) -> Result<(DynamicImage, Option<ImageFormat>), Tr
         .map_err(|e| TransformError::ProcessingFailed(format!("decode failed: {e}")))?;
 
     Ok((img, source_format))
+}
+
+/// EXIF から Orientation タグを読み取る（1〜8、失敗時は 1 = 変換なし）。
+fn read_exif_orientation(data: &[u8]) -> u32 {
+    let Ok(exif) = exif::Reader::new().read_from_container(&mut Cursor::new(data)) else {
+        return 1;
+    };
+    exif.get_field(Tag::Orientation, In::PRIMARY)
+        .and_then(|f| f.value.get_uint(0))
+        .unwrap_or(1)
+}
+
+/// EXIF Orientation 値に基づいてピクセルを回転・反転する。
+fn apply_orientation(img: DynamicImage, orientation: u32) -> DynamicImage {
+    match orientation {
+        2 => img.fliph(),
+        3 => img.rotate180(),
+        4 => img.flipv(),
+        5 => img.rotate90().fliph(),
+        6 => img.rotate90(),
+        7 => img.rotate270().fliph(),
+        8 => img.rotate270(),
+        _ => img, // 1 or unknown
+    }
 }
 
 /// ソース画像の総ピクセル数を検証し、メモリ枯渇を防ぐ。
@@ -289,6 +306,7 @@ fn encode_image(
                 .map_err(|e| TransformError::ProcessingFailed(format!("PNG encode failed: {e}")))?;
         }
         OutputFormat::WebP => {
+            // image クレートの WebP エンコーダはロスレスのみ対応（quality は無視）
             let encoder = WebPEncoder::new_lossless(&mut buf);
             img.write_with_encoder(encoder).map_err(|e| {
                 TransformError::ProcessingFailed(format!("WebP encode failed: {e}"))
