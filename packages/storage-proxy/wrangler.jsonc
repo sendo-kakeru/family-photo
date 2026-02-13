@@ -1,40 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "compatibility_date": "2025-10-21",
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "MY_KV_NAMESPACE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  //   }
-  // ],
-  // "r2_buckets": [
-  //   {
-  //     "binding": "MY_BUCKET",
-  //     "bucket_name": "my-bucket"
-  //   }
-  // ],
-  // "d1_databases": [
-  //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
-  //   }
-  // ],
-  // "ai": {
-  //   "binding": "AI"
-  // },
-  // "compatibility_flags": [
-  //   "nodejs_compat"
-  // ],
-  "env": {
-    "production": {
-      "vars": {
-        "APP_HOST": "photo.sendo-app.com",
-        "CF_ACCESS_AUD": "eef2fa7c4b4e43983ce276ef86744064367a6ea37e8acfec82679d8cec1bdc51",
-        "CF_ACCESS_TEAM_DOMAIN": "cloudflare-test-ewf-pages"
-      }
-    }
-  },
   "main": "src/index.ts",
   "name": "family-photo-storage-proxy",
   "observability": {
@@ -43,8 +9,11 @@
   },
   "vars": {
     "ALLOW_LIST_BUCKET": false,
+    "APP_HOST": "photo.sendo-app.com",
     "B2_ENDPOINT": "s3.us-west-004.backblazeb2.com",
     "BUCKET_NAME": "family-photo",
+    "CF_ACCESS_AUD": "eef2fa7c4b4e43983ce276ef86744064367a6ea37e8acfec82679d8cec1bdc51",
+    "CF_ACCESS_TEAM_DOMAIN": "cloudflare-test-ewf-pages",
     "RCLONE_DOWNLOAD": true
   }
 }
