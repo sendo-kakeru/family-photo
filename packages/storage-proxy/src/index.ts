@@ -6,8 +6,8 @@ import * as jose from "jose";
 type Env = {
   BUCKET_NAME: string;
   B2_ENDPOINT: string;
-  B2_APPLICATION_KEY_ID: string;
-  B2_APPLICATION_KEY: string;
+  B2_KEY_ID: string;
+  B2_APP_KEY: string;
   ALLOW_LIST_BUCKET?: string;
   RCLONE_DOWNLOAD?: string;
   ALLOWED_HEADERS?: string[];
@@ -126,8 +126,8 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
   const headers = filterHeaders(request.headers, env);
 
   const client = new AwsClient({
-    accessKeyId: env.B2_APPLICATION_KEY_ID,
-    secretAccessKey: env.B2_APPLICATION_KEY,
+    accessKeyId: env.B2_KEY_ID,
+    secretAccessKey: env.B2_APP_KEY,
     service: "s3",
   });
 
