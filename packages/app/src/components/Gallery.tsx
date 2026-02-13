@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { parseAsInteger, useQueryState } from "nuqs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import MediaModal from "@/components/MediaModal";
@@ -92,7 +92,10 @@ export default function Gallery() {
     revalidateFirstPage: false,
   });
 
-  const medias = data ? data.flatMap((page) => page.medias ?? []) : [];
+  const medias = useMemo(
+    () => (data ? data.flatMap((page) => page.medias ?? []) : []),
+    [data],
+  );
   const isLoadingInitialData = !data && !error;
   const isLoadingMore =
     isLoadingInitialData ||
@@ -229,14 +232,13 @@ export default function Gallery() {
       }
 
       // データを再取得
-      await totalCountMutate();
-      await mediasMutate();
+      await Promise.all([totalCountMutate(), mediasMutate()]);
 
       setSelectedKeys(new Set());
       setIsSelectionMode(false);
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error("Delete failed:", error);
+      console.error("削除に失敗しました:", error);
       alert("削除に失敗しました");
     } finally {
       setIsDeleting(false);
@@ -332,10 +334,6 @@ export default function Gallery() {
       <div className={`grid ${gridColsClass} gap-2`}>
         {medias.map((item, index) => {
           const type = inferType(item);
-          const mediaUrl =
-            type === "image"
-              ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`
-              : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`)}&original=true`;
           const isSelected = selectedKeys.has(item.key);
 
           return (
@@ -359,7 +357,7 @@ export default function Gallery() {
                     height={400}
                     loading="lazy"
                     quality={75}
-                    src={mediaUrl}
+                    src={item.key}
                     width={400}
                   />
                 ) : (
@@ -370,7 +368,7 @@ export default function Gallery() {
                       muted
                       playsInline
                       preload="metadata"
-                      src={mediaUrl}
+                      src={`${process.env.NEXT_PUBLIC_MEDIA_ORIGIN}/images/${item.key}`}
                       width={400}
                     />
                     <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">

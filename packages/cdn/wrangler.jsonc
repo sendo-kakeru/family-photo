@@ -3,37 +3,19 @@
   "compatibility_date": "2026-02-11",
   "main": "src/index.ts",
   "name": "family-photo-cdn",
-  // "compatibility_flags": [
-  //   "nodejs_compat"
-  // ],
+  // TODO: Cloud Run デプロイ後に実際の URL を設定
   // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "MY_KV_NAMESPACE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  //   }
-  // ],
-  // "r2_buckets": [
-  //   {
-  //     "binding": "MY_BUCKET",
-  //     "bucket_name": "my-bucket"
-  //   }
-  // ],
-  // "d1_databases": [
-  //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
-  //   }
-  // ],
-  // "ai": {
-  //   "binding": "AI"
+  //   "MEDIA_PROCESSOR_URL": "https://media-processor-xxxxx.run.app"
   // },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
   },
-  "routes": [{ "custom_domain": true, "pattern": "cdn.photo.sendo-app.com" }]
+  "routes": [{ "custom_domain": true, "pattern": "cdn.photo.sendo-app.com" }],
+  "services": [
+    {
+      "binding": "STORAGE_PROXY",
+      "service": "family-photo-storage-proxy"
+    }
+  ]
 }

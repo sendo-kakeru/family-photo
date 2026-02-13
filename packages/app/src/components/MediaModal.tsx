@@ -34,7 +34,6 @@ export default function MediaModal({
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [imageLoading, setImageLoading] = useState(true);
-  const [downloading, setDownloading] = useState(false);
 
   const inferType = (item: MediaItem): MediaType => {
     const key = item.key.toLowerCase();
@@ -55,37 +54,17 @@ export default function MediaModal({
     }
   };
 
-  const handleDownload = async () => {
-    if (!currentMedia || downloading) return;
+  const handleDownload = () => {
+    if (!currentMedia) return;
 
-    setDownloading(true);
-    const fileName = currentMedia.key.split("/").pop() || "download";
-
-    try {
-      // APIエンドポイント経由でダウンロード
-      const response = await fetch(
-        `/api/download?path=${encodeURIComponent(currentMedia.key)}`,
-      );
-
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Download failed:", error);
-      alert("ダウンロードに失敗しました。");
-    } finally {
-      setDownloading(false);
-    }
+    // Edge Cache Worker の ?download=true で Content-Disposition: attachment が付与される
+    const downloadUrl = `${process.env.NEXT_PUBLIC_MEDIA_ORIGIN}/images/${currentMedia.key}?download=true`;
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = currentMedia.key.split("/").pop() || "download";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // スワイプ検出
@@ -125,9 +104,9 @@ export default function MediaModal({
 
   const mediaType = inferType(currentMedia);
   const mediaUrl =
-    mediaType === "image"
-      ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${currentMedia.key}`
-      : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${currentMedia.key}`)}&original=true`;
+    mediaType === "video"
+      ? `${process.env.NEXT_PUBLIC_MEDIA_ORIGIN}/images/${currentMedia.key}`
+      : currentMedia.key;
 
   return (
     <div className="fixed inset-0 z-50 bg-black md:bg-black/90">
@@ -136,16 +115,11 @@ export default function MediaModal({
         <div className="flex items-center justify-end gap-1 md:gap-2">
           <Button
             className="h-8 w-8 text-white hover:bg-white/20 md:h-10 md:w-10"
-            disabled={downloading}
             onClick={handleDownload}
             size="icon"
             variant="ghost"
           >
-            {downloading ? (
-              <Loader2 className="h-4 w-4 animate-spin md:h-5 md:w-5" />
-            ) : (
-              <Download className="h-4 w-4 md:h-5 md:w-5" />
-            )}
+            <Download className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           <Button
             className="h-8 w-8 text-white hover:bg-white/20 md:h-10 md:w-10"
@@ -173,9 +147,8 @@ export default function MediaModal({
                 "max-h-full max-w-full object-contain transition-opacity duration-300",
                 imageLoading ? "opacity-0" : "opacity-100",
               )}
-              height={800}
+              format="webp"
               onLoad={() => setImageLoading(false)}
-              original
               src={mediaUrl}
               width={800}
             />

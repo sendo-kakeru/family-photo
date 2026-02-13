@@ -1,7 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
-import { etag } from "hono/etag";
+import * as jose from "jose";
 
 type Env = {
   BUCKET_NAME: string;
@@ -12,22 +12,27 @@ type Env = {
   RCLONE_DOWNLOAD?: string;
   ALLOWED_HEADERS?: string[];
   APP_HOST: string;
+  CF_ACCESS_TEAM_DOMAIN: string;
+  CF_ACCESS_AUD: string;
 };
 
 type HonoEnv = { Bindings: Env };
 
 const app = new Hono<HonoEnv>();
 
-// ETagミドルウェアを適用
-app.use("*", etag());
-
 // キャッシュヘッダーミドルウェア（メディアファイル用）
 app.use("*", async (c, next) => {
   await next();
 
+  // 304 Not Modified はヘッダを変更しない
+  if (c.res.status === 304) {
+    return;
+  }
+
   // メディアファイルには長期キャッシュを設定
   c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
   c.res.headers.set("Vary", "Accept-Encoding, Accept");
+  c.res.headers.set("Accept-Ranges", "bytes");
 
   // Last-Modifiedがない場合は設定
   if (!c.res.headers.has("Last-Modified")) {
@@ -39,11 +44,6 @@ const UNSIGNABLE_HEADERS = [
   "x-forwarded-proto",
   "x-real-ip",
   "accept-encoding",
-  "if-match",
-  "if-modified-since",
-  "if-none-match",
-  "if-range",
-  "if-unmodified-since",
 ];
 
 const HTTPS_PROTOCOL = "https:";
@@ -53,7 +53,7 @@ const RANGE_RETRY_ATTEMPTS = 3;
 function filterHeaders(headers: Headers, env: Env): Headers {
   const filteredHeaders: [string, string][] = [];
 
-  headers.forEach((value, key) => {
+  for (const [key, value] of headers) {
     if (
       !(
         UNSIGNABLE_HEADERS.includes(key) ||
@@ -63,7 +63,7 @@ function filterHeaders(headers: Headers, env: Env): Headers {
     ) {
       filteredHeaders.push([key, value]);
     }
-  });
+  }
 
   return new Headers(filteredHeaders);
 }
@@ -92,7 +92,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
   try {
     requestUrl = new URL(request.url);
   } catch (error) {
-    console.error("Error in handleProxy:", error);
+    console.error("handleProxyでエラーが発生しました:", error);
     return c.text("Internal Server Error", 500);
   }
 
@@ -157,7 +157,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
       if (response.headers.has("content-range")) {
         if (attempts < RANGE_RETRY_ATTEMPTS) {
           console.log(
-            `Retry for ${signedRequest.url} succeeded - response has content-range header`,
+            `${signedRequest.url} のリトライに成功しました（content-rangeヘッダーあり）`,
           );
         }
         break;
@@ -165,7 +165,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
       } else if (response.ok) {
         attempts -= 1;
         console.error(
-          `Range header in request for ${signedRequest.url} but no content-range header in response. Will retry ${attempts} more times`,
+          `${signedRequest.url} のリクエストにRangeヘッダーがありますがレスポンスにcontent-rangeがありません。残り${attempts}回リトライします`,
         );
         if (attempts > 0) {
           controller.abort();
@@ -177,7 +177,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
 
     if (attempts <= 0) {
       console.error(
-        `Tried range request for ${signedRequest.url} ${RANGE_RETRY_ATTEMPTS} times, but no content-range in response.`,
+        `${signedRequest.url} のRangeリクエストを${RANGE_RETRY_ATTEMPTS}回試行しましたが、レスポンスにcontent-rangeがありませんでした`,
       );
     }
 
@@ -197,6 +197,30 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
 
   return fetchPromise;
 }
+// Cloudflare Access JWT 検証ミドルウェア（多層防御）
+// Service Binding 経由（Edge Cache Worker から）のリクエストにはヘッダが付かないためスキップ
+app.use("*", async (c, next) => {
+  const accessJwt = c.req.header("Cf-Access-Jwt-Assertion");
+  if (!accessJwt) {
+    // Service Binding 経由のリクエスト（JWT ヘッダなし）はそのまま通す
+    return next();
+  }
+
+  // Cloud Run 経由のリクエスト（パブリックインターネット経由）は JWT を検証
+  try {
+    const certsUrl = `https://${c.env.CF_ACCESS_TEAM_DOMAIN}.cloudflareaccess.com/cdn-cgi/access/certs`;
+    const JWKS = jose.createRemoteJWKSet(new URL(certsUrl));
+    await jose.jwtVerify(accessJwt, JWKS, {
+      audience: c.env.CF_ACCESS_AUD,
+    });
+  } catch (error) {
+    console.error("Cloudflare Access JWT検証に失敗しました:", error);
+    return c.text("Forbidden", 403);
+  }
+
+  return next();
+});
+
 app.use("*", async (c, next) => {
   const corsMiddleware = cors({
     allowHeaders: ["*"],

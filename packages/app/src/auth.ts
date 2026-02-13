@@ -8,6 +8,8 @@ const ALLOW_EMAILS = new Set(
     .filter(Boolean),
 );
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async signIn({ profile }) {
@@ -15,6 +17,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return "/forbidden";
       }
       return true;
+    },
+  },
+  cookies: {
+    sessionToken: {
+      options: {
+        domain: isProduction ? ".photo.sendo-app.com" : undefined,
+      },
     },
   },
   jwt: {

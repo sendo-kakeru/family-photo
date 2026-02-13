@@ -18,5 +18,5 @@
       "dependsOn": ["^typecheck"]
     }
   },
-  "ui": "tui"
+  "ui": "stream"
 }
