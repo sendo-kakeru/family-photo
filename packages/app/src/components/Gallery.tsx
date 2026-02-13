@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { parseAsInteger, useQueryState } from "nuqs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import MediaModal from "@/components/MediaModal";
@@ -92,7 +92,10 @@ export default function Gallery() {
     revalidateFirstPage: false,
   });
 
-  const medias = data ? data.flatMap((page) => page.medias ?? []) : [];
+  const medias = useMemo(
+    () => (data ? data.flatMap((page) => page.medias ?? []) : []),
+    [data],
+  );
   const isLoadingInitialData = !data && !error;
   const isLoadingMore =
     isLoadingInitialData ||
@@ -229,14 +232,13 @@ export default function Gallery() {
       }
 
       // データを再取得
-      await totalCountMutate();
-      await mediasMutate();
+      await Promise.all([totalCountMutate(), mediasMutate()]);
 
       setSelectedKeys(new Set());
       setIsSelectionMode(false);
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error("Delete failed:", error);
+      console.error("削除に失敗しました:", error);
       alert("削除に失敗しました");
     } finally {
       setIsDeleting(false);

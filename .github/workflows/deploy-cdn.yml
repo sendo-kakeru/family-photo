@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "packages/cdn/**"
 jobs:
   deploy:
     runs-on: ubuntu-latest

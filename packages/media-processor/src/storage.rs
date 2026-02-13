@@ -85,13 +85,13 @@ impl StorageProxyClient {
         }
 
         // Content-Length があれば事前チェック
-        if let Some(content_length) = response.content_length() {
-            if content_length > MAX_INPUT_SIZE {
-                return Err(StorageError::TooLarge {
-                    size: content_length,
-                    max: MAX_INPUT_SIZE,
-                });
-            }
+        if let Some(content_length) = response.content_length()
+            && content_length > MAX_INPUT_SIZE
+        {
+            return Err(StorageError::TooLarge {
+                size: content_length,
+                max: MAX_INPUT_SIZE,
+            });
         }
 
         let data = response
