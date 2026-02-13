@@ -189,8 +189,8 @@ app.use("*", async (c, next) => {
     email = payload.email;
   } catch (error) {
     console.error(
-      "JWT verification failed:",
-      error instanceof Error ? error.name : "UnknownError",
+      "JWT検証に失敗しました:",
+      error instanceof Error ? error.name : "不明なエラー",
     );
     return c.json({ error: "認証に失敗しました" }, 401);
   }
@@ -355,7 +355,7 @@ function mapOriginError(status: number): { message: string; status: number } {
         status: 502,
       };
     default:
-      console.error(`Unexpected origin status: ${status}`);
+      console.error(`予期しないオリジンステータス: ${status}`);
       return {
         message: "メディアの取得に失敗しました",
         status: 502,
@@ -363,10 +363,80 @@ function mapOriginError(status: number): { message: string; status: number } {
   }
 }
 
-// ファイル名をサニタイズ（CRLF injection 防止）
+// ファイル名をサニタイズ（CRLF injection・パス区切り・null byte 防止）
 function sanitizeFilename(key: string): string {
   const raw = key.split("/").pop() || key;
-  return raw.replace(/[\r\n"]/g, "_");
+  return raw.replace(/[\r\n\0\\"'<>|*?]/g, "_");
+}
+
+// 画像をMedia Processorで変換して取得
+async function fetchFromMediaProcessor(
+  env: Env,
+  key: string,
+  headers: Headers,
+  cacheKeyUrl: string,
+): Promise<Response> {
+  const originUrl = new URL(`/transform/${key}`, env.MEDIA_PROCESSOR_URL);
+  originUrl.search = new URL(cacheKeyUrl).search;
+
+  const reqHeaders = new Headers(headers);
+
+  // GCP_SERVICE_ACCOUNT_KEY が設定されている場合のみ OIDC トークンを付与
+  // ローカル開発では media-processor に認証なしでアクセスする
+  if (env.GCP_SERVICE_ACCOUNT_KEY) {
+    const oidcToken = await getOidcToken(
+      env.GCP_SERVICE_ACCOUNT_KEY,
+      env.MEDIA_PROCESSOR_URL,
+    );
+    reqHeaders.set("Authorization", `Bearer ${oidcToken}`);
+  }
+
+  return fetch(originUrl, {
+    headers: reqHeaders,
+    signal: AbortSignal.timeout(MEDIA_PROCESSOR_TIMEOUT_MS),
+  });
+}
+
+// オリジンからメディアを取得（ルーティング）
+async function fetchFromOrigin(
+  c: Context<HonoEnv>,
+  key: string,
+  query: Record<string, string>,
+  download: boolean,
+  mediaType: MediaType,
+  cacheKeyUrl: string,
+): Promise<Response | { error: string; status: ContentfulStatusCode }> {
+  if (download) {
+    return fetchFromStorageProxy(c.env, c.req.url, key, c.req.raw.headers);
+  }
+
+  if (mediaType === "image") {
+    const queryError = validateQuery(query);
+    if (queryError) {
+      return { error: queryError, status: 400 };
+    }
+
+    try {
+      return await fetchFromMediaProcessor(
+        c.env,
+        key,
+        c.req.raw.headers,
+        cacheKeyUrl,
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        return { error: "メディアの処理がタイムアウトしました", status: 504 };
+      }
+      console.error(
+        "Media Processorへのリクエストに失敗しました:",
+        error instanceof Error ? error.name : "不明なエラー",
+      );
+      return { error: "メディアの取得に失敗しました", status: 502 };
+    }
+  }
+
+  // 動画/その他 → Storage Proxy (Service Binding)
+  return fetchFromStorageProxy(c.env, c.req.url, key, c.req.raw.headers);
 }
 
 // メディア配信ハンドラ
@@ -394,78 +464,29 @@ async function handleMedia(c: Context<HonoEnv>): Promise<Response> {
   }
 
   // Cache MISS → オリジンフェッチ
-  let originResponse: Response;
+  const result = await fetchFromOrigin(
+    c,
+    key,
+    query,
+    download,
+    mediaType,
+    cacheKey.url,
+  );
 
-  if (download) {
-    // download=true → Storage Proxy からオリジナルを取得
-    originResponse = await fetchFromStorageProxy(
-      c.env,
-      c.req.url,
-      key,
-      c.req.raw.headers,
-    );
-  } else if (mediaType === "image") {
-    // 画像 → クエリバリデーション → Cloud Run (Media Processor)
-    const queryError = validateQuery(query);
-    if (queryError) {
-      return c.json({ error: queryError }, 400);
-    }
-
-    const originUrl = new URL(`/transform/${key}`, c.env.MEDIA_PROCESSOR_URL);
-    const cacheKeyUrl = new URL(cacheKey.url);
-    originUrl.search = cacheKeyUrl.search;
-
-    const headers = new Headers(c.req.raw.headers);
-
-    // GCP_SERVICE_ACCOUNT_KEY が設定されている場合のみ OIDC トークンを付与
-    // ローカル開発では media-processor に認証なしでアクセスする
-    if (c.env.GCP_SERVICE_ACCOUNT_KEY) {
-      let oidcToken: string;
-      try {
-        oidcToken = await getOidcToken(
-          c.env.GCP_SERVICE_ACCOUNT_KEY,
-          c.env.MEDIA_PROCESSOR_URL,
-        );
-      } catch (error) {
-        console.error(
-          "OIDC token generation failed:",
-          error instanceof Error ? error.name : "UnknownError",
-        );
-        return c.json({ error: "メディアの取得に失敗しました" }, 502);
-      }
-      headers.set("Authorization", `Bearer ${oidcToken}`);
-    }
-
-    try {
-      originResponse = await fetch(originUrl, {
-        headers,
-        signal: AbortSignal.timeout(MEDIA_PROCESSOR_TIMEOUT_MS),
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "TimeoutError") {
-        return c.json({ error: "メディアの処理がタイムアウトしました" }, 504);
-      }
-      console.error(
-        "Media processor fetch failed:",
-        error instanceof Error ? error.name : "UnknownError",
-      );
-      return c.json({ error: "メディアの取得に失敗しました" }, 502);
-    }
-  } else {
-    // 動画/その他 → Storage Proxy (Service Binding)
-    originResponse = await fetchFromStorageProxy(
-      c.env,
-      c.req.url,
-      key,
-      c.req.raw.headers,
-    );
+  // バリデーションエラー or フェッチエラー
+  if (!(result instanceof Response)) {
+    return c.json({ error: result.error }, result.status);
   }
+
+  const originResponse = result;
 
   // エラーレスポンスはキャッシュしない
   if (!originResponse.ok) {
-    const originBody = await originResponse.text().catch(() => "(read failed)");
+    const originBody = await originResponse
+      .text()
+      .catch(() => "(読み取り失敗)");
     console.error(
-      `Origin error: status=${originResponse.status} key=${key} body=${originBody}`,
+      `オリジンエラー: status=${originResponse.status} key=${key} body=${originBody}`,
     );
     const { message, status } = mapOriginError(originResponse.status);
     return c.json({ error: message }, status as ContentfulStatusCode);

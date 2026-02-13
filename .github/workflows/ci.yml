@@ -7,7 +7,7 @@ on:
       - synchronize
 
 jobs:
-  ci:
+  ts-ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -15,8 +15,37 @@ jobs:
       - name: Setup pnpm
         uses: ./.github/actions/setup-pnpm
 
-      - name: Setup pnpm
-        uses: ./.github/actions/setup-pnpm
-
       - name: Run CI
         run: pnpm run ci
+
+  media-processor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/media-processor
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/media-processor/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/media-processor/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: cargo check
+        run: cargo check
+
+      - name: cargo clippy
+        run: cargo clippy -- -D warnings
+
+      - name: cargo test
+        run: cargo test

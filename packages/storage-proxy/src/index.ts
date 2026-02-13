@@ -53,7 +53,7 @@ const RANGE_RETRY_ATTEMPTS = 3;
 function filterHeaders(headers: Headers, env: Env): Headers {
   const filteredHeaders: [string, string][] = [];
 
-  headers.forEach((value, key) => {
+  for (const [key, value] of headers) {
     if (
       !(
         UNSIGNABLE_HEADERS.includes(key) ||
@@ -63,7 +63,7 @@ function filterHeaders(headers: Headers, env: Env): Headers {
     ) {
       filteredHeaders.push([key, value]);
     }
-  });
+  }
 
   return new Headers(filteredHeaders);
 }
@@ -92,7 +92,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
   try {
     requestUrl = new URL(request.url);
   } catch (error) {
-    console.error("Error in handleProxy:", error);
+    console.error("handleProxyでエラーが発生しました:", error);
     return c.text("Internal Server Error", 500);
   }
 
@@ -157,7 +157,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
       if (response.headers.has("content-range")) {
         if (attempts < RANGE_RETRY_ATTEMPTS) {
           console.log(
-            `Retry for ${signedRequest.url} succeeded - response has content-range header`,
+            `${signedRequest.url} のリトライに成功しました（content-rangeヘッダーあり）`,
           );
         }
         break;
@@ -165,7 +165,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
       } else if (response.ok) {
         attempts -= 1;
         console.error(
-          `Range header in request for ${signedRequest.url} but no content-range header in response. Will retry ${attempts} more times`,
+          `${signedRequest.url} のリクエストにRangeヘッダーがありますがレスポンスにcontent-rangeがありません。残り${attempts}回リトライします`,
         );
         if (attempts > 0) {
           controller.abort();
@@ -177,7 +177,7 @@ async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
 
     if (attempts <= 0) {
       console.error(
-        `Tried range request for ${signedRequest.url} ${RANGE_RETRY_ATTEMPTS} times, but no content-range in response.`,
+        `${signedRequest.url} のRangeリクエストを${RANGE_RETRY_ATTEMPTS}回試行しましたが、レスポンスにcontent-rangeがありませんでした`,
       );
     }
 
@@ -214,7 +214,7 @@ app.use("*", async (c, next) => {
       audience: c.env.CF_ACCESS_AUD,
     });
   } catch (error) {
-    console.error("Cloudflare Access JWT verification failed:", error);
+    console.error("Cloudflare Access JWT検証に失敗しました:", error);
     return c.text("Forbidden", 403);
   }
 
