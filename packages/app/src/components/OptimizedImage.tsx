@@ -2,6 +2,8 @@
 
 import { type ComponentProps, useState } from "react";
 
+const MEDIA_ORIGIN = process.env.NEXT_PUBLIC_MEDIA_ORIGIN ?? "";
+
 type OptimizedImageProps = ComponentProps<"img"> & {
   src: string;
   quality?: number;
@@ -23,21 +25,18 @@ export default function OptimizedImage({
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // 最適化されたURLを生成
-  const getOptimizedUrl = (originalUrl: string) => {
-    const params = new URLSearchParams();
-    params.set("url", originalUrl);
-    if (original) {
-      params.set("original", String(original));
-      return `/api/optimize?${params.toString()}`;
-    }
-    if (imgProps.width) params.set("width", imgProps.width.toString());
-    if (imgProps.height) params.set("height", imgProps.height.toString());
-    params.set("quality", quality.toString());
-    params.set("format", format);
+  // Edge Cache Worker 向け URL を生成
+  const getOptimizedUrl = (key: string) => {
+    const base = `${MEDIA_ORIGIN}/images/${key}`;
+    if (original) return base;
 
-    // 画像最適化APIを使用
-    return `/api/optimize?${params.toString()}`;
+    const params = new URLSearchParams();
+    if (imgProps.width) params.set("w", imgProps.width.toString());
+    if (imgProps.height) params.set("h", imgProps.height.toString());
+    params.set("q", quality.toString());
+    params.set("f", format);
+
+    return `${base}?${params.toString()}`;
   };
 
   const optimizedSrc = getOptimizedUrl(src);
@@ -52,8 +51,9 @@ export default function OptimizedImage({
     onError?.();
   };
 
-  // エラー時は元の画像を表示
-  const finalSrc = imageError ? src : optimizedSrc;
+  // エラー時は変換なし URL にフォールバック
+  const fallbackSrc = `${MEDIA_ORIGIN}/images/${src}`;
+  const finalSrc = imageError ? fallbackSrc : optimizedSrc;
 
   return (
     // biome-ignore lint/performance/noImgElement: next/imageの代替として独自最適化を実装

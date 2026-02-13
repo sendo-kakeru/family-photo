@@ -332,10 +332,6 @@ export default function Gallery() {
       <div className={`grid ${gridColsClass} gap-2`}>
         {medias.map((item, index) => {
           const type = inferType(item);
-          const mediaUrl =
-            type === "image"
-              ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`
-              : `/api/optimize?url=${encodeURIComponent(`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/${item.key}`)}&original=true`;
           const isSelected = selectedKeys.has(item.key);
 
           return (
@@ -359,7 +355,7 @@ export default function Gallery() {
                     height={400}
                     loading="lazy"
                     quality={75}
-                    src={mediaUrl}
+                    src={item.key}
                     width={400}
                   />
                 ) : (
@@ -370,7 +366,7 @@ export default function Gallery() {
                       muted
                       playsInline
                       preload="metadata"
-                      src={mediaUrl}
+                      src={`${process.env.NEXT_PUBLIC_MEDIA_ORIGIN}/images/${item.key}`}
                       width={400}
                     />
                     <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
