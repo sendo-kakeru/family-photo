@@ -2,7 +2,7 @@
 
 import { type ComponentProps, useState } from "react";
 
-const MEDIA_ORIGIN = process.env.NEXT_PUBLIC_MEDIA_ORIGIN ?? "";
+const MEDIA_ORIGIN = process.env.NEXT_PUBLIC_CDN_ORIGIN ?? "";
 
 type OptimizedImageProps = ComponentProps<"img"> & {
   src: string;
