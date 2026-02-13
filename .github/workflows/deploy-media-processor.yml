@@ -3,7 +3,6 @@ name: Deploy Media Processor
 on:
   push:
     branches: [main]
-    paths: ["packages/media-processor/**"]
 
 permissions:
   contents: read
