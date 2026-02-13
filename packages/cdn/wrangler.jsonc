@@ -1,17 +1,22 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-02-11",
+  "env": {
+    "production": {
+      "routes": [
+        { "custom_domain": true, "pattern": "cdn.photo.sendo-app.com" }
+      ],
+      "vars": {
+        "MEDIA_PROCESSOR_URL": "https://media-processor-6797382667.asia-northeast1.run.app"
+      }
+    }
+  },
   "main": "src/index.ts",
   "name": "family-photo-cdn",
-  // TODO: Cloud Run デプロイ後に実際の URL を設定
-  // "vars": {
-  //   "MEDIA_PROCESSOR_URL": "https://media-processor-xxxxx.run.app"
-  // },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
   },
-  "routes": [{ "custom_domain": true, "pattern": "cdn.photo.sendo-app.com" }],
   "services": [
     {
       "binding": "STORAGE_PROXY",

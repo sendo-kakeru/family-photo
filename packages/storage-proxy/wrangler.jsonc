@@ -1,12 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "compatibility_date": "2025-10-21",
-  "main": "src/index.ts",
-  "name": "family-photo-storage-proxy",
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  },
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
@@ -32,6 +26,21 @@
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
+  "env": {
+    "production": {
+      "vars": {
+        "APP_HOST": "photo.sendo-app.com",
+        "CF_ACCESS_AUD": "eef2fa7c4b4e43983ce276ef86744064367a6ea37e8acfec82679d8cec1bdc51",
+        "CF_ACCESS_TEAM_DOMAIN": "cloudflare-test-ewf-pages"
+      }
+    }
+  },
+  "main": "src/index.ts",
+  "name": "family-photo-storage-proxy",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   "vars": {
     "ALLOW_LIST_BUCKET": false,
     "B2_ENDPOINT": "s3.us-west-004.backblazeb2.com",
