@@ -368,7 +368,7 @@ export default function Gallery() {
                       muted
                       playsInline
                       preload="metadata"
-                      src={`${process.env.NEXT_PUBLIC_MEDIA_ORIGIN}/images/${item.key}`}
+                      src={`${process.env.NEXT_PUBLIC_CDN_ORIGIN}/images/${item.key}`}
                       width={400}
                     />
                     <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">

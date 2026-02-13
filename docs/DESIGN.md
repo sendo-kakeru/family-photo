@@ -836,7 +836,7 @@ push to main (packages/cdn/** or packages/storage-proxy/**)
 
 | 変数                       | 説明                                            |
 | -------------------------- | ----------------------------------------------- |
-| `NEXT_PUBLIC_MEDIA_ORIGIN` | Edge Cache Worker のオリジン URL                |
+| `NEXT_PUBLIC_CDN_ORIGIN` | Edge Cache Worker のオリジン URL                |
 | `B2_KEY_ID`                | B2 API キー ID（presigned URL 発行用）          |
 | `B2_APP_KEY`               | B2 アプリケーションキー（presigned URL 発行用） |
 | `AUTH_SECRET`              | next-auth JWT シークレット（現行のまま）        |

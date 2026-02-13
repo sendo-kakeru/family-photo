@@ -58,7 +58,7 @@ export default function MediaModal({
     if (!currentMedia) return;
 
     // Edge Cache Worker の ?download=true で Content-Disposition: attachment が付与される
-    const downloadUrl = `${process.env.NEXT_PUBLIC_MEDIA_ORIGIN}/images/${currentMedia.key}?download=true`;
+    const downloadUrl = `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/images/${currentMedia.key}?download=true`;
     const link = document.createElement("a");
     link.href = downloadUrl;
     link.download = currentMedia.key.split("/").pop() || "download";
@@ -105,7 +105,7 @@ export default function MediaModal({
   const mediaType = inferType(currentMedia);
   const mediaUrl =
     mediaType === "video"
-      ? `${process.env.NEXT_PUBLIC_MEDIA_ORIGIN}/images/${currentMedia.key}`
+      ? `${process.env.NEXT_PUBLIC_CDN_ORIGIN}/images/${currentMedia.key}`
       : currentMedia.key;
 
   return (
