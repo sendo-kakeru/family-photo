@@ -66,7 +66,7 @@ pub enum TransformError {
 }
 
 const MAX_DIMENSION: u32 = 4096;
-const MAX_PIXELS: u64 = 16_777_216; // 4096 * 4096
+const MAX_PIXELS: u64 = 1_000_000_000; // 1GP（実質無制限、極端な攻撃のみ防止）
 const DEFAULT_QUALITY: u8 = 80;
 
 /// 指定されたパラメータに従って画像バイト列を変換する。
