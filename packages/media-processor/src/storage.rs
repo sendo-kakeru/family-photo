@@ -84,6 +84,19 @@ impl StorageProxyClient {
             .await
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
+        // デバッグ: レスポンスの最初の100バイトを確認
+        let preview = if data.len() > 100 {
+            String::from_utf8_lossy(&data[..100])
+        } else {
+            String::from_utf8_lossy(&data)
+        };
+        tracing::info!(
+            key = %key,
+            size = data.len(),
+            preview = %preview,
+            "received data from Storage Proxy"
+        );
+
         Ok(data)
     }
 }
