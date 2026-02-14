@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@repo/workers-shared": "workspace:*",
     "hono": "^4.11.9",
     "jose": "^6.1.3"
   },
