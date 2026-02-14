@@ -102,6 +102,9 @@ importers:
 
   packages/cdn:
     dependencies:
+      '@repo/workers-shared':
+        specifier: workspace:*
+        version: link:../workers-shared
       hono:
         specifier: ^4.11.9
         version: 4.11.9
@@ -123,6 +126,9 @@ importers:
 
   packages/storage-proxy:
     dependencies:
+      '@repo/workers-shared':
+        specifier: workspace:*
+        version: link:../workers-shared
       aws4fetch:
         specifier: ^1.0.20
         version: 1.0.20

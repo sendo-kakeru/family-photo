@@ -21,44 +21,43 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useGalleryModal } from "@/features/gallery/hooks/useGalleryModal";
+import { useGallerySelection } from "@/features/gallery/hooks/useGallerySelection";
+import { useScrollButtons } from "@/features/gallery/hooks/useScrollButtons";
 
 type MediaType = "image" | "video";
 
 type MediaItem = {
-  key: string; // 配信用パス
-  size: number; // バイト数
-  lastModified: string; // ISO文字列
+  key: string;
+  size: number;
+  lastModified: string;
 };
 
 type MediasResponse = {
-  medias: MediaItem[]; // 一覧
-  nextPage: number | null; // 次ページ番号
-  isTruncated: boolean; // まだ続きがあるか
-  keyCount: number; // 現在のページのアイテム数
+  medias: MediaItem[];
+  nextPage: number | null;
+  isTruncated: boolean;
+  keyCount: number;
 };
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+const inferType = (item: MediaItem): MediaType => {
+  const key = item.key.toLowerCase();
+  if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(key)) return "image";
+  if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(key)) return "video";
+  return "image";
+};
+
 export default function Gallery() {
   const observerTargetRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const topRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useQueryState(
     "columns",
     parseAsInteger.withDefault(4),
   );
   const [isColsOpen, setIsColsOpen] = useState(false);
-  const [showScrollButtons, setShowScrollButtons] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-  // モーダル用に pushState したかどうかを追跡
-  const modalHistoryPushedRef = useRef(false);
-  // 選択モード
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // データフェッチ
   const { data: totalCount, mutate: totalCountMutate } = useSWR<{
     count: number;
   }>("/api/medias/count", fetcher, {
@@ -66,19 +65,12 @@ export default function Gallery() {
     revalidateOnReconnect: false,
   });
 
-  // SWR Infinite for pagination
   const getKey = (
     pageIndex: number,
     previousPageData: MediasResponse | null,
   ) => {
     if (previousPageData && !previousPageData.isTruncated) return null;
-
-    const params = new URLSearchParams({
-      maxKeys: "500",
-      page: pageIndex.toString(),
-    });
-
-    return `/api/medias?${params.toString()}`;
+    return `/api/medias?maxKeys=500&page=${pageIndex}`;
   };
 
   const {
@@ -104,12 +96,29 @@ export default function Gallery() {
   const isReachingEnd =
     isEmpty || (data && !data[data.length - 1]?.isTruncated);
 
-  const inferType = (item: MediaItem): MediaType => {
-    const key = item.key.toLowerCase();
-    if (/\.(avif|webp|jpe?g|png|gif|bmp|tiff|svg)$/.test(key)) return "image";
-    if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(key)) return "video";
-    return "image";
-  };
+  // カスタムフック
+  const {
+    modalOpen,
+    currentMediaIndex,
+    openModal,
+    requestCloseModal,
+    navigateModal,
+  } = useGalleryModal();
+
+  const {
+    isSelectionMode,
+    selectedKeys,
+    isDeleting,
+    showDeleteConfirm,
+    toggleSelectionMode,
+    toggleSelection,
+    toggleSelectAll,
+    handleDelete,
+    setShowDeleteConfirm,
+  } = useGallerySelection({ medias, mediasMutate, totalCountMutate });
+
+  const { showScrollButtons, bottomRef, topRef, scrollToBottom, scrollToTop } =
+    useScrollButtons();
 
   // Infinite scroll
   useEffect(() => {
@@ -129,122 +138,6 @@ export default function Gallery() {
     return () => observer.disconnect();
   }, [isLoadingMore, isReachingEnd, setSize, size]);
 
-  // スクロール位置を監視してボタンの表示/非表示を制御
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollButtons(window.scrollY > 200);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const scrollToBottom = () => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  };
-
-  const scrollToTop = () => {
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const navigateModal = (index: number) => {
-    setCurrentMediaIndex(index);
-  };
-
-  // モーダルを開く: まず履歴にモーダル専用 state を積んでから開く
-  const openModal = (index: number) => {
-    setCurrentMediaIndex(index);
-    // 既に積んでいる場合は二重に積まない
-    if (!modalHistoryPushedRef.current) {
-      window.history.pushState({ galleryModal: true, mediaIndex: index }, "");
-      modalHistoryPushedRef.current = true;
-    }
-    setModalOpen(true);
-  };
-
-  // ボタン等から閉じる: pushState した分だけ戻る(=popstateで閉じる)
-  const requestCloseModal = () => {
-    if (modalHistoryPushedRef.current) {
-      window.history.back();
-      return;
-    }
-    setModalOpen(false);
-  };
-
-  // popstate (ブラウザバック) 時にモーダルを閉じる
-  useEffect(() => {
-    const handlePopState = () => {
-      // モーダル履歴を抜けた (戻る) とき
-      if (
-        modalHistoryPushedRef.current &&
-        !window.history.state?.galleryModal
-      ) {
-        modalHistoryPushedRef.current = false;
-        setModalOpen(false);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  // 選択モードを切り替え
-  const toggleSelectionMode = () => {
-    setIsSelectionMode(!isSelectionMode);
-    if (isSelectionMode) {
-      setSelectedKeys(new Set());
-    }
-  };
-
-  // 画像の選択/選択解除
-  const toggleSelection = (key: string) => {
-    const newSelected = new Set(selectedKeys);
-    if (newSelected.has(key)) {
-      newSelected.delete(key);
-    } else {
-      newSelected.add(key);
-    }
-    setSelectedKeys(newSelected);
-  };
-
-  // 全選択/全解除
-  const toggleSelectAll = () => {
-    if (selectedKeys.size === medias.length) {
-      setSelectedKeys(new Set());
-    } else {
-      setSelectedKeys(new Set(medias.map((m) => m.key)));
-    }
-  };
-
-  // 削除実行
-  const handleDelete = async () => {
-    if (selectedKeys.size === 0) return;
-
-    setIsDeleting(true);
-    try {
-      const response = await fetch("/api/medias", {
-        body: JSON.stringify({ keys: Array.from(selectedKeys) }),
-        headers: { "Content-Type": "application/json" },
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("削除に失敗しました");
-      }
-
-      // データを再取得
-      await Promise.all([totalCountMutate(), mediasMutate()]);
-
-      setSelectedKeys(new Set());
-      setIsSelectionMode(false);
-      setShowDeleteConfirm(false);
-    } catch (error) {
-      console.error("削除に失敗しました:", error);
-      alert("削除に失敗しました");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const gridColsMap: Record<number, string> = {
     2: "grid-cols-2",
     3: "grid-cols-3",
@@ -256,13 +149,11 @@ export default function Gallery() {
 
   return (
     <>
-      {/* トップアンカー */}
       <div ref={topRef} />
       <div className="grid justify-between gap-y-4 py-4">
         {/* ツールバー */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-2">
-            {/* 列数切替 */}
             <Popover onOpenChange={setIsColsOpen} open={isColsOpen}>
               <PopoverTrigger asChild>
                 <Button className="w-fit" size="sm" variant="outline">
@@ -290,7 +181,6 @@ export default function Gallery() {
               </PopoverContent>
             </Popover>
 
-            {/* 選択モード切替 */}
             <Button
               onClick={toggleSelectionMode}
               size="sm"
@@ -300,7 +190,6 @@ export default function Gallery() {
             </Button>
           </div>
 
-          {/* 選択モード時のアクション */}
           {isSelectionMode && (
             <div className="flex gap-2">
               <Button onClick={toggleSelectAll} size="sm" variant="outline">
@@ -376,7 +265,6 @@ export default function Gallery() {
                     </div>
                   </div>
                 )}
-                {/* 選択モード時のチェックマーク */}
                 {isSelectionMode && (
                   <div
                     className={`absolute top-2 right-2 h-6 w-6 rounded-full border-2 ${
@@ -403,27 +291,23 @@ export default function Gallery() {
         </div>
       )}
 
-      {/* 全て読み込み済み */}
       {isReachingEnd && medias.length > 0 && (
         <div className="mt-8 text-center text-gray-500">
           すべてのメディアを表示しました
         </div>
       )}
 
-      {/* エラー表示 */}
       {error && (
         <div className="mt-8 text-center text-red-500">
           エラーが発生しました。ページを更新してください。
         </div>
       )}
 
-      {/* スクロール用のアンカー */}
       <div ref={bottomRef} />
 
       {/* 固定位置のスクロールボタン */}
       {medias.length > 0 && showScrollButtons && (
         <>
-          {/* トップへスクロール */}
           <Button
             className="fixed right-6 bottom-20 z-50 rounded-full shadow-lg"
             onClick={scrollToTop}
@@ -432,8 +316,6 @@ export default function Gallery() {
           >
             <ArrowUp className="h-5 w-5" />
           </Button>
-
-          {/* ボトムへスクロール */}
           <Button
             className="fixed right-6 bottom-6 z-50 rounded-full shadow-lg"
             onClick={scrollToBottom}
@@ -445,7 +327,6 @@ export default function Gallery() {
         </>
       )}
 
-      {/* メディアモーダル */}
       <MediaModal
         allMedia={medias}
         currentIndex={currentMediaIndex}
