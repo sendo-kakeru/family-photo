@@ -8,30 +8,30 @@ pub fn validate_params(
     quality: Option<u8>,
 ) -> Result<(), TransformError> {
     // 品質の検証
-    if let Some(q) = quality {
-        if q == 0 || q > 100 {
-            return Err(TransformError::InvalidParams(format!(
-                "quality must be 1-100, got {q}"
-            )));
-        }
+    if let Some(q) = quality
+        && (q == 0 || q > 100)
+    {
+        return Err(TransformError::InvalidParams(format!(
+            "quality must be 1-100, got {q}"
+        )));
     }
 
     // 幅の検証
-    if let Some(w) = width {
-        if w == 0 || w > MAX_DIMENSION {
-            return Err(TransformError::InvalidParams(format!(
-                "width must be 1-{MAX_DIMENSION}, got {w}"
-            )));
-        }
+    if let Some(w) = width
+        && (w == 0 || w > MAX_DIMENSION)
+    {
+        return Err(TransformError::InvalidParams(format!(
+            "width must be 1-{MAX_DIMENSION}, got {w}"
+        )));
     }
 
     // 高さの検証
-    if let Some(h) = height {
-        if h == 0 || h > MAX_DIMENSION {
-            return Err(TransformError::InvalidParams(format!(
-                "height must be 1-{MAX_DIMENSION}, got {h}"
-            )));
-        }
+    if let Some(h) = height
+        && (h == 0 || h > MAX_DIMENSION)
+    {
+        return Err(TransformError::InvalidParams(format!(
+            "height must be 1-{MAX_DIMENSION}, got {h}"
+        )));
     }
 
     Ok(())

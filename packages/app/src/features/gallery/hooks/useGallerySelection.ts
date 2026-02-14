@@ -8,13 +8,11 @@ export type MediaItem = {
 
 type UseGallerySelectionProps = {
   medias: MediaItem[];
-  totalCountMutate: () => Promise<unknown>;
   mediasMutate: () => Promise<unknown>;
 };
 
 export function useGallerySelection({
   medias,
-  totalCountMutate,
   mediasMutate,
 }: UseGallerySelectionProps) {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -66,8 +64,8 @@ export function useGallerySelection({
         throw new Error("削除に失敗しました");
       }
 
-      // データを再取得
-      await Promise.all([totalCountMutate(), mediasMutate()]);
+      // データを再取得（totalCountも含まれる）
+      await mediasMutate();
 
       setSelectedKeys(new Set());
       setIsSelectionMode(false);

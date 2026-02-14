@@ -36,7 +36,7 @@ pub async fn transform(
     let format = query
         .format
         .as_deref()
-        .and_then(OutputFormat::from_str)
+        .and_then(|s| s.parse().ok())
         .unwrap_or(OutputFormat::Jpeg);
 
     let params = TransformParams::new(

@@ -1,4 +1,5 @@
 use crate::constants::DEFAULT_QUALITY;
+use std::str::FromStr;
 
 /// 出力フォーマット
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -9,18 +10,21 @@ pub enum OutputFormat {
     Avif,
 }
 
-impl OutputFormat {
-    /// 文字列から OutputFormat を作成
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for OutputFormat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "jpeg" | "jpg" => Some(Self::Jpeg),
-            "png" => Some(Self::Png),
-            "webp" => Some(Self::WebP),
-            "avif" => Some(Self::Avif),
-            _ => None,
+            "jpeg" | "jpg" => Ok(Self::Jpeg),
+            "png" => Ok(Self::Png),
+            "webp" => Ok(Self::WebP),
+            "avif" => Ok(Self::Avif),
+            _ => Err(format!("Unknown format: {}", s)),
         }
     }
+}
 
+impl OutputFormat {
     /// Content-Type を取得
     pub fn content_type(&self) -> &'static str {
         match self {
@@ -64,12 +68,12 @@ mod tests {
 
     #[test]
     fn test_output_format_from_str() {
-        assert_eq!(OutputFormat::from_str("jpeg"), Some(OutputFormat::Jpeg));
-        assert_eq!(OutputFormat::from_str("JPG"), Some(OutputFormat::Jpeg));
-        assert_eq!(OutputFormat::from_str("png"), Some(OutputFormat::Png));
-        assert_eq!(OutputFormat::from_str("webp"), Some(OutputFormat::WebP));
-        assert_eq!(OutputFormat::from_str("avif"), Some(OutputFormat::Avif));
-        assert_eq!(OutputFormat::from_str("unknown"), None);
+        assert_eq!("jpeg".parse::<OutputFormat>().ok(), Some(OutputFormat::Jpeg));
+        assert_eq!("JPG".parse::<OutputFormat>().ok(), Some(OutputFormat::Jpeg));
+        assert_eq!("png".parse::<OutputFormat>().ok(), Some(OutputFormat::Png));
+        assert_eq!("webp".parse::<OutputFormat>().ok(), Some(OutputFormat::WebP));
+        assert_eq!("avif".parse::<OutputFormat>().ok(), Some(OutputFormat::Avif));
+        assert!("unknown".parse::<OutputFormat>().is_err());
     }
 
     #[test]

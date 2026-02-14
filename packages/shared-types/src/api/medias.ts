@@ -12,6 +12,8 @@ export type MediasResponse = {
   isTruncated: boolean;
   /** このページのアイテム数 */
   keyCount: number;
+  /** 総メディア数 */
+  totalCount: number;
 };
 
 /**

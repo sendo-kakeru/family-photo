@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     // 全データをソート済みで取得
     const allItems = await getAllMediasSorted();
+    const totalCount = allItems.length;
 
     // ページネーション処理
     const startIdx = page * maxKeys;
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
       keyCount: pageItems.length,
       medias,
       nextPage: hasMore ? page + 1 : null,
+      totalCount,
     });
   } catch (error) {
     console.error("Error listing medias:", error);

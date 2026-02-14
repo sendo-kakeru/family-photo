@@ -1,5 +1,6 @@
 "use client";
 
+import type { MediasResponse } from "@repo/shared-types";
 import {
   ArrowDown,
   ArrowUp,
@@ -11,7 +12,6 @@ import {
 } from "lucide-react";
 import { parseAsInteger, useQueryState } from "nuqs";
 import { useEffect, useMemo, useRef, useState } from "react";
-import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import MediaModal from "@/components/MediaModal";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -33,13 +33,6 @@ type MediaItem = {
   lastModified: string;
 };
 
-type MediasResponse = {
-  medias: MediaItem[];
-  nextPage: number | null;
-  isTruncated: boolean;
-  keyCount: number;
-};
-
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 const inferType = (item: MediaItem): MediaType => {
@@ -58,13 +51,6 @@ export default function Gallery() {
   const [isColsOpen, setIsColsOpen] = useState(false);
 
   // データフェッチ
-  const { data: totalCount, mutate: totalCountMutate } = useSWR<{
-    count: number;
-  }>("/api/medias/count", fetcher, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-  });
-
   const getKey = (
     pageIndex: number,
     previousPageData: MediasResponse | null,
@@ -88,6 +74,7 @@ export default function Gallery() {
     () => (data ? data.flatMap((page) => page.medias ?? []) : []),
     [data],
   );
+  const totalCount = data?.[0]?.totalCount ?? 0;
   const isLoadingInitialData = !data && !error;
   const isLoadingMore =
     isLoadingInitialData ||
@@ -115,7 +102,7 @@ export default function Gallery() {
     toggleSelectAll,
     handleDelete,
     setShowDeleteConfirm,
-  } = useGallerySelection({ medias, mediasMutate, totalCountMutate });
+  } = useGallerySelection({ medias, mediasMutate });
 
   const { showScrollButtons, bottomRef, topRef, scrollToBottom, scrollToTop } =
     useScrollButtons();
@@ -210,9 +197,9 @@ export default function Gallery() {
 
         {/* カウンター */}
         <div className="text-gray-600 text-sm">
-          {totalCount?.count && (
+          {totalCount > 0 && (
             <>
-              全{totalCount.count}件中 {medias.length}件表示
+              全{totalCount}件中 {medias.length}件表示
               {isReachingEnd && " (全て読み込み済み)"}
             </>
           )}

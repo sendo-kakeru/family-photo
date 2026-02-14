@@ -1,5 +1,4 @@
 import {
-  AuthenticationError,
   extractEmailFromPayload,
   getAllowEmails,
   isEmailAllowed,
@@ -51,10 +50,7 @@ export function authMiddleware(): MiddlewareHandler<HonoEnv> {
       // 認証成功
       return next();
     } catch (error) {
-      if (error instanceof AuthenticationError) {
-        return c.json({ error: error.message }, 401);
-      }
-
+      // エラーの詳細はログに記録するのみで、ユーザーには汎用メッセージを返す
       console.error(
         "JWT検証に失敗しました:",
         error instanceof Error ? error.name : "不明なエラー",

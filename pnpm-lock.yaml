@@ -41,6 +41,9 @@ importers:
       '@radix-ui/react-slot':
         specifier: ^1.2.4
         version: 1.2.4(@types/react@19.2.14)(react@19.2.4)
+      '@repo/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
