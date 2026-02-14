@@ -1,5 +1,4 @@
 export type {
-  MediasCountResponse,
   MediasResponse,
   UploadSignedUrlRequest,
   UploadSignedUrlResponse,

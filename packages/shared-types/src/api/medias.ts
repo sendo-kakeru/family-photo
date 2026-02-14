@@ -15,11 +15,3 @@ export type MediasResponse = {
   /** 総メディア数 */
   totalCount: number;
 };
-
-/**
- * /api/medias/count のレスポンス型
- */
-export type MediasCountResponse = {
-  /** 総メディア数 */
-  count: number;
-};
