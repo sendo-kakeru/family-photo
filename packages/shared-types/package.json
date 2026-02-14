@@ -1,0 +1,18 @@
+{
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "exports": {
+    ".": "./dist/index.d.ts",
+    "./api": "./dist/api/index.d.ts",
+    "./media": "./dist/media.d.ts"
+  },
+  "name": "@repo/shared-types",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "version": "0.1.0"
+}

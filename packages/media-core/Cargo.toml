@@ -1,0 +1,19 @@
+[package]
+name = "media-core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "media_core"
+path = "src/lib.rs"
+
+[dependencies]
+# Workspace dependencies
+image = { workspace = true }
+fast_image_resize = { workspace = true }
+kamadak-exif = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+
+# Additional dependencies
+urlencoding = "2"
