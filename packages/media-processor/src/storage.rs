@@ -84,15 +84,6 @@ impl StorageProxyClient {
             .await
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-        // 読み込み後にもサイズを確認
-        let actual_size = data.len() as u64;
-        if actual_size > MAX_INPUT_SIZE {
-            return Err(StorageError::TooLarge {
-                size: actual_size,
-                max: MAX_INPUT_SIZE,
-            });
-        }
-
         Ok(data)
     }
 }
