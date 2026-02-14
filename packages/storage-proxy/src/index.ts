@@ -1,237 +1,40 @@
-import { AwsClient } from "aws4fetch";
-import { type Context, Hono } from "hono";
-import { cors } from "hono/cors";
-import * as jose from "jose";
-
-type Env = {
-  BUCKET_NAME: string;
-  B2_ENDPOINT: string;
-  B2_KEY_ID: string;
-  B2_APP_KEY: string;
-  ALLOW_LIST_BUCKET?: string;
-  RCLONE_DOWNLOAD?: string;
-  ALLOWED_HEADERS?: string[];
-  APP_HOST: string;
-  CF_ACCESS_TEAM_DOMAIN: string;
-  CF_ACCESS_AUD: string;
-};
-
-type HonoEnv = { Bindings: Env };
+import { Hono } from "hono";
+import { handleProxy } from "./handlers/proxy";
+import { cfAccessAuthMiddleware } from "./middleware/auth";
+import { cacheHeadersMiddleware } from "./middleware/cache-headers";
+import { corsMiddleware } from "./middleware/cors";
+import type { HonoEnv } from "./types";
 
 const app = new Hono<HonoEnv>();
 
-// キャッシュヘッダーミドルウェア（メディアファイル用）
-app.use("*", async (c, next) => {
-  await next();
+/**
+ * キャッシュヘッダーミドルウェア（全ルートに適用）
+ */
+app.use("*", cacheHeadersMiddleware());
 
-  // 304 Not Modified はヘッダを変更しない
-  if (c.res.status === 304) {
-    return;
-  }
+/**
+ * Cloudflare Access JWT 検証ミドルウェア（多層防御）
+ */
+app.use("*", cfAccessAuthMiddleware());
 
-  // メディアファイルには長期キャッシュを設定
-  c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
-  c.res.headers.set("Vary", "Accept-Encoding, Accept");
-  c.res.headers.set("Accept-Ranges", "bytes");
+/**
+ * CORS ミドルウェア
+ */
+app.use("*", corsMiddleware());
 
-  // Last-Modifiedがない場合は設定
-  if (!c.res.headers.has("Last-Modified")) {
-    c.res.headers.set("Last-Modified", new Date().toUTCString());
-  }
-});
-
-const UNSIGNABLE_HEADERS = [
-  "x-forwarded-proto",
-  "x-real-ip",
-  "accept-encoding",
-];
-
-const HTTPS_PROTOCOL = "https:";
-const HTTPS_PORT = "443";
-const RANGE_RETRY_ATTEMPTS = 3;
-
-function filterHeaders(headers: Headers, env: Env): Headers {
-  const filteredHeaders: [string, string][] = [];
-
-  for (const [key, value] of headers) {
-    if (
-      !(
-        UNSIGNABLE_HEADERS.includes(key) ||
-        key.startsWith("cf-") ||
-        (env.ALLOWED_HEADERS && !env.ALLOWED_HEADERS.includes(key))
-      )
-    ) {
-      filteredHeaders.push([key, value]);
-    }
-  }
-
-  return new Headers(filteredHeaders);
-}
-
-function createHeadResponse(response: Response): Response {
-  return new Response(null, {
-    headers: response.headers,
-    status: response.status,
-    statusText: response.statusText,
-  });
-}
-
-function isListBucketRequest(env: Env, path: string): boolean {
-  const pathSegments = path.split("/");
-  return (
-    (env.BUCKET_NAME === "$path" && pathSegments.length < 2) ||
-    (env.BUCKET_NAME !== "$path" && path.length === 0)
-  );
-}
-
-async function handleProxy(c: Context<HonoEnv>, method: "GET" | "HEAD") {
-  const env = c.env;
-  const request = c.req.raw;
-  let requestUrl: URL;
-
-  try {
-    requestUrl = new URL(request.url);
-  } catch (error) {
-    console.error("handleProxyでエラーが発生しました:", error);
-    return c.text("Internal Server Error", 500);
-  }
-
-  requestUrl.protocol = HTTPS_PROTOCOL;
-  requestUrl.port = HTTPS_PORT;
-
-  let path = requestUrl.pathname.substring(1); // 先頭の "/" を削除
-  path = path.replace(/\/$/, ""); // 末尾の "/" を削除
-
-  if (
-    isListBucketRequest(env, path) &&
-    String(env.ALLOW_LIST_BUCKET) !== "true"
-  ) {
-    return c.notFound();
-  }
-
-  const rcloneDownload = String(env.RCLONE_DOWNLOAD) === "true";
-
-  switch (env.BUCKET_NAME) {
-    case "$path":
-      requestUrl.hostname = env.B2_ENDPOINT;
-      break;
-    case "$host":
-      requestUrl.hostname = `${requestUrl.hostname.split(".")[0]}.${env.B2_ENDPOINT}`;
-      break;
-    default:
-      requestUrl.hostname = `${env.BUCKET_NAME}.${env.B2_ENDPOINT}`;
-      break;
-  }
-
-  const headers = filterHeaders(request.headers, env);
-
-  const client = new AwsClient({
-    accessKeyId: env.B2_KEY_ID,
-    secretAccessKey: env.B2_APP_KEY,
-    service: "s3",
-  });
-
-  if (rcloneDownload) {
-    if (env.BUCKET_NAME === "$path") {
-      requestUrl.pathname = path.replace(/^file\//, "");
-    } else {
-      requestUrl.pathname = path.replace(/^file\/[^/]+\//, "");
-    }
-  }
-
-  const signedRequest = await client.sign(requestUrl.toString(), {
-    headers: headers,
-    method: "GET",
-  });
-
-  if (signedRequest.headers.has("range")) {
-    let attempts = RANGE_RETRY_ATTEMPTS;
-    let response: Response;
-    do {
-      const controller = new AbortController();
-      response = await fetch(signedRequest.url, {
-        headers: signedRequest.headers,
-        method: signedRequest.method,
-        signal: controller.signal,
-      });
-      if (response.headers.has("content-range")) {
-        if (attempts < RANGE_RETRY_ATTEMPTS) {
-          console.log(
-            `${signedRequest.url} のリトライに成功しました（content-rangeヘッダーあり）`,
-          );
-        }
-        break;
-        // biome-ignore lint/style/noUselessElse: no problem
-      } else if (response.ok) {
-        attempts -= 1;
-        console.error(
-          `${signedRequest.url} のリクエストにRangeヘッダーがありますがレスポンスにcontent-rangeがありません。残り${attempts}回リトライします`,
-        );
-        if (attempts > 0) {
-          controller.abort();
-        }
-      } else {
-        break;
-      }
-    } while (attempts > 0);
-
-    if (attempts <= 0) {
-      console.error(
-        `${signedRequest.url} のRangeリクエストを${RANGE_RETRY_ATTEMPTS}回試行しましたが、レスポンスにcontent-rangeがありませんでした`,
-      );
-    }
-
-    if (method === "HEAD") {
-      return createHeadResponse(response);
-    }
-
-    return response;
-  }
-
-  const fetchPromise = fetch(signedRequest);
-
-  if (method === "HEAD") {
-    const response = await fetchPromise;
-    return createHeadResponse(response);
-  }
-
-  return fetchPromise;
-}
-// Cloudflare Access JWT 検証ミドルウェア（多層防御）
-// Service Binding 経由（Edge Cache Worker から）のリクエストにはヘッダが付かないためスキップ
-app.use("*", async (c, next) => {
-  const accessJwt = c.req.header("Cf-Access-Jwt-Assertion");
-  if (!accessJwt) {
-    // Service Binding 経由のリクエスト（JWT ヘッダなし）はそのまま通す
-    return next();
-  }
-
-  // Cloud Run 経由のリクエスト（パブリックインターネット経由）は JWT を検証
-  try {
-    const certsUrl = `https://${c.env.CF_ACCESS_TEAM_DOMAIN}.cloudflareaccess.com/cdn-cgi/access/certs`;
-    const JWKS = jose.createRemoteJWKSet(new URL(certsUrl));
-    await jose.jwtVerify(accessJwt, JWKS, {
-      audience: c.env.CF_ACCESS_AUD,
-    });
-  } catch (error) {
-    console.error("Cloudflare Access JWT検証に失敗しました:", error);
-    return c.text("Forbidden", 403);
-  }
-
-  return next();
-});
-
-app.use("*", async (c, next) => {
-  const corsMiddleware = cors({
-    allowHeaders: ["*"],
-    allowMethods: ["GET", "HEAD"],
-    origin: [`https://${c.env.APP_HOST}`, "http://localhost:3000"],
-  });
-  return corsMiddleware(c, next);
-});
+/**
+ * GET: B2 ストレージからファイルを取得
+ */
 app.get("*", (c) => handleProxy(c, "GET"));
+
+/**
+ * HEAD: B2 ストレージのファイルメタデータを取得
+ */
 app.on("HEAD", "*", (c) => handleProxy(c, "HEAD"));
 
+/**
+ * その他のメソッドは拒否
+ */
 app.all("*", (c) => {
   return c.text("Method Not Allowed", 405);
 });

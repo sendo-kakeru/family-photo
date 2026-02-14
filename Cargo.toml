@@ -1,0 +1,13 @@
+[workspace]
+members = ["packages/media-core", "packages/media-processor"]
+resolver = "2"
+
+[workspace.dependencies]
+# Image processing
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "avif"] }
+fast_image_resize = "6"
+kamadak-exif = "0.6"
+
+# Common utilities
+bytes = "1"
+thiserror = "2"

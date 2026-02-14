@@ -4,8 +4,9 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 
 use crate::AppState;
-use crate::storage::StorageError;
-use crate::transform::{OutputFormat, TransformError, TransformParams};
+use media_core::{
+    validate_key, MediaError, OutputFormat, StorageError, TransformError, TransformParams,
+};
 
 const CACHE_CONTROL_IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
@@ -35,21 +36,15 @@ pub async fn transform(
     let format = query
         .format
         .as_deref()
-        .map(|f| {
-            OutputFormat::from_str_param(f).ok_or_else(|| {
-                AppError::BadRequest(format!(
-                    "unsupported format '{f}'. supported: jpg, png, webp, avif"
-                ))
-            })
-        })
-        .transpose()?;
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(OutputFormat::Jpeg);
 
-    let params = TransformParams {
-        width: query.width,
-        height: query.height,
+    let params = TransformParams::new(
+        query.width,
+        query.height,
         format,
-        quality: query.quality,
-    };
+        query.quality,
+    );
 
     tracing::info!(key = %key, "fetching object from Storage Proxy");
     let input_bytes = state.storage_client.get_object(&key).await?;
@@ -64,7 +59,7 @@ pub async fn transform(
         "transforming image"
     );
 
-    let (output_bytes, content_type) = crate::transform::transform(&input_bytes, &params)?;
+    let (output_bytes, content_type): (_, &'static str) = crate::transform::transform(&input_bytes, &params)?;
 
     Ok((
         StatusCode::OK,
@@ -77,46 +72,6 @@ pub async fn transform(
         .into_response())
 }
 
-/// パストラバーサル攻撃を防ぐためにオブジェクトキーを検証する。
-fn validate_key(key: &str) -> Result<(), AppError> {
-    if key.is_empty() {
-        return Err(AppError::BadRequest(
-            "key parameter is required".to_string(),
-        ));
-    }
-    if key.len() > 1024 {
-        return Err(AppError::BadRequest(
-            "key parameter too long (max: 1024)".to_string(),
-        ));
-    }
-
-    // URLデコード後の値をチェック
-    let decoded = urlencoding::decode(key)
-        .map_err(|_| AppError::BadRequest("invalid URL encoding".to_string()))?;
-
-    // ホワイトリストアプローチ: 英数字、スラッシュ、ハイフン、アンダースコア、ドットのみ
-    if !decoded
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '/' || c == '-' || c == '_' || c == '.')
-    {
-        return Err(AppError::BadRequest(
-            "key contains invalid characters".to_string(),
-        ));
-    }
-
-    // パストラバーサルパターンの検出
-    if decoded.contains("..")
-        || decoded.starts_with('/')
-        || decoded.contains("//")
-        || decoded.contains('\\')
-    {
-        return Err(AppError::BadRequest(
-            "invalid key: path traversal detected".to_string(),
-        ));
-    }
-
-    Ok(())
-}
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -126,6 +81,19 @@ pub enum AppError {
     TransformFailed(String),
     StorageUnavailable(String),
     Internal(String),
+}
+
+impl From<MediaError> for AppError {
+    fn from(err: MediaError) -> Self {
+        match err {
+            MediaError::Validation(msg) => {
+                tracing::warn!(error = %msg, "validation error");
+                AppError::BadRequest(msg)
+            }
+            MediaError::Storage(storage_err) => storage_err.into(),
+            MediaError::Transform(transform_err) => transform_err.into(),
+        }
+    }
 }
 
 impl From<StorageError> for AppError {
