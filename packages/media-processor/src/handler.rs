@@ -135,9 +135,6 @@ impl From<StorageError> for AppError {
                 tracing::warn!(key = %key, "object not found");
                 AppError::NotFound("object not found".to_string())
             }
-            StorageError::TooLarge { size, max } => {
-                AppError::BadRequest(format!("object too large: {size} bytes (max: {max} bytes)"))
-            }
             StorageError::Forbidden => {
                 tracing::error!("access denied by Storage Proxy (check CF Access credentials)");
                 AppError::StorageUnavailable("storage access denied".to_string())
