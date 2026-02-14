@@ -14,9 +14,6 @@ pub enum StorageError {
     #[error("object not found: {key}")]
     NotFound { key: String },
 
-    #[error("object too large: {size} bytes (max: {max} bytes)")]
-    TooLarge { size: u64, max: u64 },
-
     #[error("access denied")]
     Forbidden,
 
@@ -24,8 +21,6 @@ pub enum StorageError {
     Internal(String),
 }
 
-/// 最大入力ファイルサイズ: 10MB
-const MAX_INPUT_SIZE: u64 = 10 * 1024 * 1024;
 
 impl StorageProxyClient {
     /// 環境変数から StorageProxyClient を作成する。
@@ -82,16 +77,6 @@ impl StorageProxyClient {
                     "unexpected status: {status}"
                 )));
             }
-        }
-
-        // Content-Length があれば事前チェック
-        if let Some(content_length) = response.content_length()
-            && content_length > MAX_INPUT_SIZE
-        {
-            return Err(StorageError::TooLarge {
-                size: content_length,
-                max: MAX_INPUT_SIZE,
-            });
         }
 
         let data = response
