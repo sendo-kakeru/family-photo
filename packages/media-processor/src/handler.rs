@@ -150,11 +150,20 @@ impl From<StorageError> for AppError {
 impl From<TransformError> for AppError {
     fn from(err: TransformError) -> Self {
         match err {
-            TransformError::InvalidParams(msg) => AppError::BadRequest(msg),
-            TransformError::ResolutionTooLarge { width, height } => AppError::BadRequest(format!(
-                "image resolution {width}x{height} exceeds maximum 4096x4096"
-            )),
-            TransformError::ProcessingFailed(msg) => AppError::TransformFailed(msg),
+            TransformError::InvalidParams(msg) => {
+                tracing::warn!(error = %msg, "invalid transform parameters");
+                AppError::BadRequest(msg)
+            }
+            TransformError::ResolutionTooLarge { width, height } => {
+                tracing::warn!(width = %width, height = %height, "image resolution too large");
+                AppError::BadRequest(format!(
+                    "image resolution {width}x{height} exceeds maximum 4096x4096"
+                ))
+            }
+            TransformError::ProcessingFailed(msg) => {
+                tracing::error!(error = %msg, "image processing failed");
+                AppError::TransformFailed(msg)
+            }
         }
     }
 }
