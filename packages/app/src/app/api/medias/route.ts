@@ -1,39 +1,5 @@
-import {
-  type _Object,
-  DeleteObjectsCommand,
-  ListObjectsV2Command,
-} from "@aws-sdk/client-s3";
 import { type NextRequest, NextResponse } from "next/server";
-import { B2_S3_BUCKET, s3 } from "@/lib/s3";
-
-async function getAllMediasSorted(): Promise<_Object[]> {
-  // 全てのオブジェクトを取得
-  let allItems: _Object[] = [];
-  let continuationToken: string | undefined;
-
-  do {
-    const command = new ListObjectsV2Command({
-      Bucket: B2_S3_BUCKET,
-      ContinuationToken: continuationToken,
-      MaxKeys: 1000,
-    });
-
-    const response = await s3.send(command);
-    if (response.Contents) {
-      allItems = allItems.concat(response.Contents);
-    }
-    continuationToken = response.NextContinuationToken;
-  } while (continuationToken);
-
-  // 最終更新日時でソート（新しい順）
-  allItems.sort((a, b) => {
-    const dateA = a.LastModified ? new Date(a.LastModified).getTime() : 0;
-    const dateB = b.LastModified ? new Date(b.LastModified).getTime() : 0;
-    return dateB - dateA;
-  });
-
-  return allItems;
-}
+import { deleteObjects, getAllMediasSorted } from "@/lib/services/s3-service";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -82,16 +48,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "No keys provided" }, { status: 400 });
     }
 
-    // S3から削除
-    const command = new DeleteObjectsCommand({
-      Bucket: B2_S3_BUCKET,
-      Delete: {
-        Objects: keys.map((key) => ({ Key: key })),
-        Quiet: false,
-      },
-    });
-
-    const response = await s3.send(command);
+    const response = await deleteObjects(keys);
 
     return NextResponse.json({
       deleted: response.Deleted?.length || 0,

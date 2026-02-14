@@ -1,26 +1,9 @@
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
-import { B2_S3_BUCKET, s3 } from "@/lib/s3";
+import { countAllObjects } from "@/lib/services/s3-service";
 
 export async function GET() {
   try {
-    let totalCount = 0;
-    let continuationToken: string | undefined;
-
-    do {
-      const cmd = new ListObjectsV2Command({
-        Bucket: B2_S3_BUCKET,
-        ContinuationToken: continuationToken,
-        MaxKeys: 1000,
-      });
-
-      const response = await s3.send(cmd);
-
-      const count = (response.Contents || []).length;
-
-      totalCount += count;
-      continuationToken = response.NextContinuationToken;
-    } while (continuationToken);
+    const totalCount = await countAllObjects();
 
     return NextResponse.json({ count: totalCount });
   } catch (error) {
