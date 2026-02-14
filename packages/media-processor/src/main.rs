@@ -1,18 +1,16 @@
 mod handler;
-mod storage;
 mod transform;
 
 use std::net::SocketAddr;
 
 use axum::Router;
 use axum::routing::get;
+use media_core::StorageProxyClient;
 use tokio::signal;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt};
-
-use crate::storage::StorageProxyClient;
 
 #[derive(Clone)]
 pub struct AppState {
