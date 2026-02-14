@@ -44,13 +44,9 @@ jobs:
           cache-to: type=inline
 
       - name: Deploy to Cloud Run
-        env:
-          STORAGE_PROXY_URL: ${{ secrets.STORAGE_PROXY_URL }}
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           gcloud run deploy media-processor \
             --image asia-northeast1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/media-processor/media-processor:${{ github.sha }} \
             --region asia-northeast1 \
             --no-allow-unauthenticated \
-            --set-env-vars "STORAGE_PROXY_URL=$STORAGE_PROXY_URL,CF_ACCESS_CLIENT_ID=$CF_ACCESS_CLIENT_ID,CF_ACCESS_CLIENT_SECRET=$CF_ACCESS_CLIENT_SECRET"
+            --set-env-vars "STORAGE_PROXY_URL=${{ secrets.STORAGE_PROXY_URL }},CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }},CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}"
