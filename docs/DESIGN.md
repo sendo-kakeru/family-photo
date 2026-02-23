@@ -865,7 +865,240 @@ push to main (packages/cdn/** or packages/storage-proxy/**)
 
 ---
 
-## 12. マイグレーション計画
+## 12. 配信フロー詳細（図解）
+
+### 12.1 画像配信フロー
+
+```
+┌─────────┐
+│ Browser │
+└────┬────┘
+     │ 1. GET /images/:key?w=400&h=400&f=webp
+     │    Cookie: authjs.session-token=<JWT>
+     ↓
+┌────────────────────┐
+│ CDN Worker         │
+│ (Edge Cache)       │
+├────────────────────┤
+│ 2. JWT検証         │
+│ 3. 拡張子で画像判定│
+│ 4. Cache確認       │
+└────┬───────────────┘
+     │ Cache MISS
+     │ 5. GET /transform/:key?w=400&h=400&f=webp
+     │    Authorization: Bearer <OIDC Token>
+     ↓
+┌──────────────────────┐
+│ Media Processor      │
+│ (Cloud Run)          │
+├──────────────────────┤
+│ 6. IAM認証（自動）   │
+│ 7. パラメータ検証    │
+└────┬─────────────────┘
+     │ 8. GET /:key
+     │    CF-Access-Client-Id: <ID>
+     │    CF-Access-Client-Secret: <SECRET>
+     ↓
+┌──────────────────────┐
+│ Storage Proxy Worker │
+├──────────────────────┤
+│ 9. Service Token検証 │
+│ 10. AWS Sig v4署名   │
+└────┬─────────────────┘
+     │ 11. 署名付きリクエスト
+     ↓
+┌─────────────┐
+│ Backblaze B2│
+└────┬────────┘
+     │ 12. 原本バイナリ
+     ↓
+┌──────────────────────┐
+│ Media Processor      │
+├──────────────────────┤
+│ 13. デコード         │
+│ 14. メタデータ削除   │
+│ 15. リサイズ         │
+│ 16. フォーマット変換 │
+│ 17. エンコード       │
+└────┬─────────────────┘
+     │ 18. 変換済みバイナリ
+     ↓
+┌────────────────────┐
+│ CDN Worker         │
+├────────────────────┤
+│ 19. Cache保存      │
+│ 20. Cache-Control  │
+└────┬───────────────┘
+     │ 21. レスポンス返却
+     ↓
+┌─────────┐
+│ Browser │
+└─────────┘
+```
+
+**重要ポイント：**
+- 画像は**パラメータなしでも必ずMedia Processorを経由**（メタデータ削除のため）
+- Cache HITの場合、ステップ5-18をスキップ
+- 認証は3層：JWT（CDN） → OIDC（Cloud Run） → Service Token（Storage Proxy）
+
+### 12.2 動画配信フロー
+
+```
+┌─────────┐
+│ Browser │
+└────┬────┘
+     │ 1. GET /images/:key.mp4
+     │    Cookie: authjs.session-token=<JWT>
+     ↓
+┌────────────────────┐
+│ CDN Worker         │
+│ (Edge Cache)       │
+├────────────────────┤
+│ 2. JWT検証         │
+│ 3. 拡張子で動画判定│
+│ 4. Cache確認       │
+└────┬───────────────┘
+     │ Cache MISS
+     │ 5. env.STORAGE_PROXY.fetch() ← Service Binding
+     ↓
+┌──────────────────────┐
+│ Storage Proxy Worker │
+├──────────────────────┤
+│ 6. AWS Sig v4署名    │
+└────┬─────────────────┘
+     │ 7. 署名付きリクエスト
+     ↓
+┌─────────────┐
+│ Backblaze B2│
+└────┬────────┘
+     │ 8. 原本バイナリ（Range対応）
+     ↓
+┌────────────────────┐
+│ CDN Worker         │
+├────────────────────┤
+│ 9. Cache保存       │
+└────┬───────────────┘
+     │ 10. レスポンス返却
+     ↓
+┌─────────┐
+│ Browser │
+└─────────┘
+```
+
+**重要ポイント：**
+- 動画は**Media Processorを経由せず、Storage Proxyから直接配信**
+- Service Binding（内部通信）を使用するため、認証不要
+- Rangeリクエストに対応（動画ストリーミング）
+
+### 12.3 アップロードフロー
+
+```
+┌─────────┐
+│ Browser │
+└────┬────┘
+     │ 1. POST /api/upload-signed-url
+     │    Cookie: authjs.session-token (セッション)
+     ↓
+┌──────────────┐
+│ Next.js API  │
+│ (Vercel)     │
+├──────────────┤
+│ 2. セッション確認
+│ 3. Presigned URL生成
+│    (AWS SDK)
+└────┬─────────┘
+     │ 4. { key, url } 返却
+     ↓
+┌─────────┐
+│ Browser │
+└────┬────┘
+     │ 5. PUT <presigned-url>
+     │    Content-Type: image/jpeg
+     │    Body: <file binary>
+     ↓
+┌─────────────┐
+│ Backblaze B2│
+└─────────────┘
+```
+
+**重要ポイント：**
+- ブラウザから**B2に直接アップロード**（Workerを経由しない）
+- Presigned URLに署名が含まれているため、追加の認証不要
+- **CORS設定が必須**（B2バケットのCORS設定）
+
+---
+
+## 13. 認証方法詳細
+
+### 13.1 認証レイヤー一覧
+
+| 通信経路 | 認証方式 | ヘッダー/Cookie | 検証場所 | 失敗時のステータス |
+|---------|---------|----------------|---------|-------------------|
+| Browser → CDN | next-auth JWT | `Cookie: authjs.session-token` | CDN Worker | 401 Unauthorized |
+| Browser → Next.js | next-auth Session | `Cookie: authjs.session-token` | Next.js Middleware | 401/Redirect |
+| CDN → Media Processor | Cloud Run IAM (OIDC) | `Authorization: Bearer <OIDC>` | Cloud Run (GCP IAM) | 403 Forbidden |
+| CDN → Storage Proxy | Service Binding | なし（内部通信） | なし | - |
+| Media Processor → Storage Proxy | Cloudflare Access Service Token | `CF-Access-Client-Id`<br>`CF-Access-Client-Secret` | Cloudflare Access Edge | 302 Redirect (未認証時) |
+| Browser → B2 (Upload) | AWS Signature v4 (Presigned URL) | URLパラメータ | B2 | 403 Forbidden |
+
+### 13.2 JWT検証（CDN Worker）
+
+**検証内容：**
+1. CookieからJWTトークンを取得（`__Secure-authjs.session-token` または `authjs.session-token`）
+2. `AUTH_SECRET` + `AUTH_SALT` でHKDF鍵を導出
+3. `jose.jwtDecrypt()` で復号・検証
+4. `payload.email` を `ALLOW_EMAILS` と照合
+
+**エラー時の挙動：**
+```json
+HTTP 401
+{ "error": "認証に失敗しました" }
+```
+
+### 13.3 Cloud Run IAM認証（CDN → Media Processor）
+
+**OIDC Token生成フロー：**
+1. GCP Service Accountの秘密鍵（RS256）でJWTを自己署名
+2. `https://oauth2.googleapis.com/token` でOIDC Tokenに交換
+3. `Authorization: Bearer <OIDC Token>` で Cloud Runにリクエスト
+4. Cloud RunのIAMレイヤーで自動検証
+
+**トークンキャッシュ：**
+- 有効期限：1時間
+- グローバル変数でキャッシュ（有効期限5分前にリフレッシュ）
+
+**エラー時の挙動：**
+```
+HTTP 403 Forbidden
+（Cloud Run IAMが自動的に拒否）
+```
+
+### 13.4 Cloudflare Access Service Token（Media Processor → Storage Proxy）
+
+**Service Token検証フロー：**
+1. Media ProcessorがHTTPヘッダーに以下を設定：
+   ```
+   CF-Access-Client-Id: <CLIENT_ID>
+   CF-Access-Client-Secret: <CLIENT_SECRET>
+   ```
+2. Cloudflare Access（エッジ）で検証
+3. 検証成功時、`Cf-Access-Jwt-Assertion` ヘッダーを付与
+4. Storage Proxy Workerで多層防御のためJWT署名を再検証
+
+**エラー時の挙動：**
+```
+HTTP 302 Found
+Location: https://<team>.cloudflareaccess.com/cdn-cgi/access/login/...
+```
+
+**トラブルシューティング：**
+- 302リダイレクトが返る場合、Service Tokenが無効または未設定
+- Cloudflare Zero Trust Dashboard → Access → Service Auth → Service Tokens で確認
+- Access Application Policyで「Service Auth」が設定されているか確認
+
+---
+
+## 14. マイグレーション計画
 
 ### Phase 1: GCP 初期構築
 
