@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.989.0",
-    "@aws-sdk/s3-request-presigner": "^3.989.0",
+    "@aws-sdk/client-s3": "^3.994.0",
+    "@aws-sdk/s3-request-presigner": "^3.994.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-popover": "^1.1.15",
