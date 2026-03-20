@@ -37,6 +37,7 @@ const STATUS_LABEL: Record<UploadTaskStatus, string> = {
 };
 
 type UploadTask = {
+  id: string;
   file: File;
   objectKey: string | null;
   presignedUrl: string | null;
@@ -63,6 +64,7 @@ export default function UploadPage() {
         parse(PickedFileSchema, { file, size: file.size });
         nextTasks.push({
           file,
+          id: crypto.randomUUID(),
           objectKey: null,
           presignedUrl: null,
           progressPercent: 0,
@@ -271,13 +273,10 @@ export default function UploadPage() {
       </div>
 
       <ul className="grid gap-2">
-        {uploadTasks.map((task, index) => {
+        {uploadTasks.map((task) => {
           const isDone = task.status === "done";
           return (
-            <li
-              className="rounded border p-3"
-              key={`${index}-${task.file.name}`}
-            >
+            <li className="rounded border p-3" key={task.id}>
               <div className="flex items-center gap-2 text-sm">
                 <FiCheckCircle
                   aria-label={isDone ? "完了" : "未完了"}
