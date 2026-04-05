@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1018.0",
-    "@aws-sdk/s3-request-presigner": "^3.1018.0",
+    "@aws-sdk/client-s3": "^3.1023.0",
+    "@aws-sdk/s3-request-presigner": "^3.1023.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-popover": "^1.1.15",
@@ -9,7 +9,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.7.0",
-    "next": "16.2.1",
+    "next": "16.2.2",
     "next-auth": "5.0.0-beta.30",
     "nuqs": "^2.8.9",
     "react": "19.2.4",

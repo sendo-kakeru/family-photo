@@ -1,8 +1,8 @@
 {
   "devDependencies": {
-    "@biomejs/biome": "2.4.9",
+    "@biomejs/biome": "2.4.10",
     "lefthook": "^2.1.4",
-    "turbo": "^2.8.20",
+    "turbo": "^2.9.3",
     "typescript": "6.0.2"
   },
   "engines": {
