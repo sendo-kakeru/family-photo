@@ -3,7 +3,7 @@
     "@biomejs/biome": "2.4.10",
     "lefthook": "^2.1.6",
     "turbo": "^2.9.6",
-    "typescript": "6.0.2"
+    "typescript": "6.0.3"
   },
   "engines": {
     "node": ">=24"
