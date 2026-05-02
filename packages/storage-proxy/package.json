@@ -5,7 +5,7 @@
     "jose": "^6.2.3"
   },
   "devDependencies": {
-    "wrangler": "^4.84.1"
+    "wrangler": "^4.87.0"
   },
   "name": "@repo/storage-proxy",
   "scripts": {
