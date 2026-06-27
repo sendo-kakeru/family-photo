@@ -10,7 +10,7 @@ jobs:
   ts-ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup pnpm
         uses: ./.github/actions/setup-pnpm
@@ -24,7 +24,7 @@ jobs:
       run:
         working-directory: packages/media-processor
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
