@@ -4,7 +4,7 @@
     "jose": "^6.2.8"
   },
   "devDependencies": {
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.118.0"
   },
   "name": "@repo/cdn",
   "scripts": {
