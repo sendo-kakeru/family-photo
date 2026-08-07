@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "hono": "^4.12.32",
-    "jose": "^6.2.4"
+    "jose": "^6.2.8"
   },
   "devDependencies": {
     "wrangler": "^4.114.0"
