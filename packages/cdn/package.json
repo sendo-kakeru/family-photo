@@ -1,10 +1,10 @@
 {
   "dependencies": {
-    "hono": "^4.13.1",
-    "jose": "^6.2.8"
+    "hono": "^4.13.2",
+    "jose": "^6.2.9"
   },
   "devDependencies": {
-    "wrangler": "^4.120.1"
+    "wrangler": "^4.123.0"
   },
   "name": "@repo/cdn",
   "scripts": {
