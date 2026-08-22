@@ -1,15 +1,15 @@
 {
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
-    "lefthook": "^2.1.10",
-    "turbo": "^2.10.10",
+    "lefthook": "2.1.10",
+    "turbo": "2.10.10",
     "typescript": "7.0.2"
   },
   "engines": {
-    "node": ">=24"
+    "node": "24.19.0"
   },
   "name": "family-photo",
-  "packageManager": "pnpm@10.17.0",
+  "packageManager": "pnpm@11.22.0",
   "private": true,
   "scripts": {
     "build": "turbo run build",
