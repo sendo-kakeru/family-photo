@@ -1,2 +1,7 @@
 packages:
   - "packages/*"
+minimumReleaseAge: 4320
+allowBuilds:
+  esbuild: true
+  lefthook: true
+  workerd: true
