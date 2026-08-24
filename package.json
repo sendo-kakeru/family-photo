@@ -9,7 +9,7 @@
     "node": "24.19.0"
   },
   "name": "family-photo",
-  "packageManager": "pnpm@11.22.0",
+  "packageManager": "pnpm@11.23.0",
   "private": true,
   "scripts": {
     "build": "turbo run build",
