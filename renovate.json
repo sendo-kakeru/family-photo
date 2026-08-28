@@ -55,5 +55,7 @@
     { "groupName": "pnpm", "matchDepNames": ["pnpm"] }
   ],
   "prConcurrentLimit": 30,
-  "prHourlyLimit": 0
+  "prHourlyLimit": 0,
+  "schedule": ["* * * * 5"],
+  "timezone": "Asia/Tokyo"
 }
