@@ -261,8 +261,8 @@ importers:
   packages/cdn:
     dependencies:
       hono:
-        specifier: 4.13.8
-        version: 4.13.8
+        specifier: 4.13.10
+        version: 4.13.10
       jose:
         specifier: 6.2.12
         version: 6.2.12
@@ -279,8 +279,8 @@ importers:
         specifier: 1.0.20
         version: 1.0.20
       hono:
-        specifier: 4.13.8
-        version: 4.13.8
+        specifier: 4.13.10
+        version: 4.13.10
       jose:
         specifier: 6.2.12
         version: 6.2.12
@@ -1577,8 +1577,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  hono@4.13.8:
-    resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
+  hono@4.13.10:
+    resolution: {integrity: sha512-dQuLsa5oO+47QVMVMaaD9cIv8ctmVtK1iRvwWngkfloFJMeFeuoUFDswIqZGxmGX3hrRzREgEArjkK9OgsQEhA==}
     engines: {node: '>=16.9.0'}
 
   jiti@2.7.0:
@@ -3097,7 +3097,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  hono@4.13.8: {}
+  hono@4.13.10: {}
 
   jiti@2.7.0: {}
 
