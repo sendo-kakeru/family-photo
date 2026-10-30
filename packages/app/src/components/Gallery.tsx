@@ -267,7 +267,7 @@ export default function Gallery() {
               <PopoverTrigger asChild>
                 <Button className="w-fit" size="sm" variant="outline">
                   {columns}列
-                  <ChevronDown className="ml-2 h-4 w-4" />
+                  <ChevronDown className="ml-2 size-4" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-32 p-2">
@@ -312,7 +312,7 @@ export default function Gallery() {
                 size="sm"
                 variant="destructive"
               >
-                <Trash2 className="mr-1 h-4 w-4" />
+                <Trash2 className="mr-1 size-4" />
                 削除 ({selectedKeys.size})
               </Button>
             </div>
@@ -320,7 +320,7 @@ export default function Gallery() {
         </div>
 
         {/* カウンター */}
-        <div className="text-gray-600 text-sm">
+        <div className="text-sm text-gray-600">
           {totalCount?.count && (
             <>
               全{totalCount.count}件中 {medias.length}件表示
@@ -352,7 +352,7 @@ export default function Gallery() {
                 {type === "image" ? (
                   <OptimizedImage
                     alt={`${index + 1}`}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    className="size-full object-cover transition-transform group-hover:scale-105"
                     format="webp"
                     height={400}
                     loading="lazy"
@@ -361,9 +361,9 @@ export default function Gallery() {
                     width={400}
                   />
                 ) : (
-                  <div className="relative h-full w-full">
+                  <div className="relative size-full">
                     <video
-                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      className="size-full object-cover transition-transform group-hover:scale-105"
                       height={400}
                       muted
                       playsInline
@@ -372,20 +372,20 @@ export default function Gallery() {
                       width={400}
                     />
                     <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 hover:bg-black/10">
-                      <Play className="h-10 w-10 text-white drop-shadow" />
+                      <Play className="size-10 text-white drop-shadow" />
                     </div>
                   </div>
                 )}
                 {/* 選択モード時のチェックマーク */}
                 {isSelectionMode && (
                   <div
-                    className={`absolute top-2 right-2 h-6 w-6 rounded-full border-2 ${
+                    className={`absolute top-2 right-2 size-6 rounded-full border-2 ${
                       isSelected
                         ? "border-blue-500 bg-blue-500"
                         : "border-white bg-black/20"
                     } flex items-center justify-center`}
                   >
-                    {isSelected && <Check className="h-4 w-4 text-white" />}
+                    {isSelected && <Check className="size-4 text-white" />}
                   </div>
                 )}
               </button>
@@ -398,7 +398,7 @@ export default function Gallery() {
       {(isLoadingInitialData || !isReachingEnd) && (
         <div className="mt-8 flex justify-center py-4" ref={observerTargetRef}>
           {(isLoadingInitialData || isLoadingMore) && (
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="size-8 animate-spin text-gray-400" />
           )}
         </div>
       )}
@@ -430,7 +430,7 @@ export default function Gallery() {
             size="icon"
             variant="outline"
           >
-            <ArrowUp className="h-5 w-5" />
+            <ArrowUp className="size-5" />
           </Button>
 
           {/* ボトムへスクロール */}
@@ -440,7 +440,7 @@ export default function Gallery() {
             size="icon"
             variant="outline"
           >
-            <ArrowDown className="h-5 w-5" />
+            <ArrowDown className="size-5" />
           </Button>
         </>
       )}
@@ -459,7 +459,7 @@ export default function Gallery() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-4 font-bold text-lg">削除の確認</h2>
+            <h2 className="mb-4 text-lg font-bold">削除の確認</h2>
             <p className="mb-6 text-gray-600">
               選択した{selectedKeys.size}件のメディアを削除しますか？
               <br />
@@ -480,7 +480,7 @@ export default function Gallery() {
               >
                 {isDeleting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 size-4 animate-spin" />
                     削除中...
                   </>
                 ) : (

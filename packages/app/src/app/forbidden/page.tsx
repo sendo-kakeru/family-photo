@@ -5,7 +5,7 @@ export default async function () {
   return (
     <div className="grid place-items-center">
       <div className="grid place-items-center gap-4">
-        <h1 className="font-bold text-xl">
+        <h1 className="text-xl font-bold">
           このメールアドレスは許可されていません。
         </h1>
         <Button asChild className="font-bold" size="lg">

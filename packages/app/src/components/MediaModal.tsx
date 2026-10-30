@@ -111,23 +111,23 @@ export default function MediaModal({
   return (
     <div className="fixed inset-0 z-50 bg-black md:bg-black/90">
       {/* ヘッダー */}
-      <div className="absolute top-0 right-0 left-0 z-10 bg-linear-to-b from-black/70 to-transparent p-2 pt-safe-top md:p-4">
+      <div className="pt-safe-top absolute inset-x-0 top-0 z-10 bg-linear-to-b from-black/70 to-transparent p-2 md:p-4">
         <div className="flex items-center justify-end gap-1 md:gap-2">
           <Button
-            className="h-8 w-8 text-white hover:bg-white/20 md:h-10 md:w-10"
+            className="size-8 text-white hover:bg-white/20 md:size-10"
             onClick={handleDownload}
             size="icon"
             variant="ghost"
           >
-            <Download className="h-4 w-4 md:h-5 md:w-5" />
+            <Download className="size-4 md:size-5" />
           </Button>
           <Button
-            className="h-8 w-8 text-white hover:bg-white/20 md:h-10 md:w-10"
+            className="size-8 text-white hover:bg-white/20 md:size-10"
             onClick={onClose}
             size="icon"
             variant="ghost"
           >
-            <X className="h-4 w-4 md:h-5 md:w-5" />
+            <X className="size-4 md:size-5" />
           </Button>
         </div>
       </div>
@@ -154,7 +154,7 @@ export default function MediaModal({
             />
             {imageLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-white" />
+                <Loader2 className="size-8 animate-spin text-white" />
               </div>
             )}
           </>
@@ -173,23 +173,23 @@ export default function MediaModal({
       {/* ナビゲーションボタン */}
       {currentIndex > 0 && (
         <Button
-          className="absolute top-1/2 left-2 h-8 w-8 -translate-y-1/2 text-white hover:bg-white/20 md:left-4 md:h-10 md:w-10"
+          className="absolute top-1/2 left-2 size-8 -translate-y-1/2 text-white hover:bg-white/20 md:left-4 md:size-10"
           onClick={goToPrevious}
           size="icon"
           variant="ghost"
         >
-          <ChevronLeft className="h-6 w-6 md:h-8 md:w-8" />
+          <ChevronLeft className="size-6 md:size-8" />
         </Button>
       )}
 
       {currentIndex < allMedia.length - 1 && (
         <Button
-          className="absolute top-1/2 right-2 h-8 w-8 -translate-y-1/2 text-white hover:bg-white/20 md:right-4 md:h-10 md:w-10"
+          className="absolute top-1/2 right-2 size-8 -translate-y-1/2 text-white hover:bg-white/20 md:right-4 md:size-10"
           onClick={goToNext}
           size="icon"
           variant="ghost"
         >
-          <ChevronRight className="h-6 w-6 md:h-8 md:w-8" />
+          <ChevronRight className="size-6 md:size-8" />
         </Button>
       )}
     </div>
