@@ -256,7 +256,7 @@ export default function UploadPage() {
               ホームへ戻る
             </Link>
           </Button>
-          <p className="text-gray-600 text-sm">
+          <p className="text-sm text-gray-600">
             {completedCount}/{uploadTasks.length} 完了
           </p>
         </div>

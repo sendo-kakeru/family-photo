@@ -17,7 +17,14 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!node_modules", "!.next", "!dist", "!build"]
+    "includes": [
+      "**",
+      "!node_modules",
+      "!.next",
+      "!dist",
+      "!build",
+      "!pnpm-lock.yaml"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -42,13 +49,13 @@
       },
       "nursery": {
         "noFloatingPromises": "error",
-        "useSortedClasses": {
-          "level": "warn",
-          "options": {
-            "attributes": ["classList"],
-            "functions": ["cn", "cva"]
-          }
-        }
+        "noMisusedPromises": "error",
+        "noReturnInFinally": "error",
+        "useAwaitThenable": "error",
+        "useNullishCoalescing": "error",
+        "usePromiseRejectErrors": "error",
+        "useTailwindShorthandClasses": "warn",
+        "useTailwindSortedClasses": "warn"
       },
       "preset": "recommended",
       "style": {
@@ -69,6 +76,16 @@
         "noUnknownAtRules": "off"
       }
     }
+  },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "tailwind": {
+    "attributes": ["class", "className", "classList"],
+    "mergeFunctions": ["cn", "cva"],
+    "stylesheet": "./packages/app/src/app/globals.css"
   },
   "vcs": {
     "clientKind": "git",
