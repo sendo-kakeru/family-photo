@@ -10,10 +10,10 @@ jobs:
   ts-ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Setup pnpm
-        uses: ./.github/actions/setup-pnpm
+        uses: $/.github/actions/setup-pnpm
 
       - name: Run CI
         run: pnpm run ci
@@ -24,15 +24,15 @@ jobs:
       run:
         working-directory: packages/media-processor
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy
+          rustup default stable
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
