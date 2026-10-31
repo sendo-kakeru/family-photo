@@ -626,7 +626,29 @@ Cloudflare ダッシュボードで以下を設定する。
 | Access Policy                 | 同上 > Policies                                         | Action: Service Auth, Service Token を指定        |
 | Service Token                 | Zero Trust > Access > Service Auth > Service Tokens     | Cloud Run 用の Service Token を発行               |
 
-#### 5.3.4 Secret 管理
+#### 5.3.4 Backblaze B2 CORS 設定
+
+ブラウザから Presigned URL で B2 に直接アップロードするため、バケットに CORS ルールの設定が必須。
+
+B2 の Web UI の CORS 設定は「全オリジン許可」「単一オリジン許可」といった選択肢しかなく、複数オリジンの指定・許可する操作・ヘッダーの指定などの**厳密な設定は CLI（[B2 CLI](https://www.backblaze.com/docs/cloud-storage-command-line-tools)）からしか行えない**。そのため CORS ルールは以下のコマンドで設定する。
+
+```bash
+# 事前に認証しておく
+b2 account authorize
+
+b2 bucket update family-photo --cors-rules '[
+  {
+    "corsRuleName": "allowPhotoUpload",
+    "allowedOrigins": ["https://photo.sendo.page", "http://localhost:3000"],
+    "allowedOperations": ["s3_head", "s3_put", "s3_get"],
+    "allowedHeaders": ["*"],
+    "exposeHeaders": ["etag", "x-amz-request-id", "x-amz-id-2"],
+    "maxAgeSeconds": 3600
+  }
+]'
+```
+
+#### 5.3.5 Secret 管理
 
 | プラットフォーム          | 管理方法              | 対象                                                                  |
 | ------------------------- | --------------------- | --------------------------------------------------------------------- |
@@ -1024,7 +1046,7 @@ push to main (packages/cdn/** or packages/storage-proxy/**)
 **重要ポイント：**
 - ブラウザから**B2に直接アップロード**（Workerを経由しない）
 - Presigned URLに署名が含まれているため、追加の認証不要
-- **CORS設定が必須**（B2バケットのCORS設定）
+- **CORS設定が必須**（B2バケットのCORS設定。CLI からのみ厳密に設定可能。[5.3.4](#534-backblaze-b2-初期構築cors-設定) を参照）
 
 ---
 

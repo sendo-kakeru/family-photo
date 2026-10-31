@@ -33,6 +33,7 @@
 | Vercel ドメイン              | `photo.sendo.page` を追加                                                               |
 | Vercel 環境変数              | `NEXT_PUBLIC_CDN_ORIGIN`（画像・ダウンロード URL の生成に使用。ビルド時に埋め込まれる） |
 | Google Cloud Console (OAuth) | 承認済み JavaScript 生成元 / リダイレクト URI                                           |
+| Backblaze B2 バケット CORS   | `allowedOrigins`（CLI からのみ設定可能。[DESIGN.md 5.3.4](DESIGN.md#534-backblaze-b2-初期構築cors-設定) を参照） |
 
 以下は workers.dev / run.app を指しているため**変更不要**。
 
