@@ -24,7 +24,7 @@ export default async function Home({
     >
       <div className="grid place-items-center gap-4">
         {error === "unauthorized" && (
-          <p className="font-bold text-xl">続行するにはログインしてください</p>
+          <p className="text-xl font-bold">続行するにはログインしてください</p>
         )}
         <GoogleSigninButton type="submit">
           Signin with Google

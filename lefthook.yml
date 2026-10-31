@@ -1,6 +1,6 @@
 pre-commit:
   parallel: true
   jobs:
-    - run: npx @biomejs/biome check --fix --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
-      glob: "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}"
+    - run: pnpm exec biome check --fix --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
+      glob: "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc,css,yml,yaml}"
       stage_fixed: true
