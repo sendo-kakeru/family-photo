@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        hostname: "cdn.photo.sendo-app.com",
+        hostname: "cdn.photo.sendo.page",
         protocol: "https",
       },
     ],

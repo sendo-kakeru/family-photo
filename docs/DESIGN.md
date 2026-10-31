@@ -97,12 +97,12 @@ Backblaze B2
 
 ### 2.3 ドメイン設計
 
-ベースドメイン: `photo.sendo-app.com`
+ベースドメイン: `photo.sendo.page`
 
 | サービス      | ドメイン                      | 備考                                |
 | ------------- | ----------------------------- | ----------------------------------- |
-| Frontend      | `photo.sendo-app.com`         | Vercel にカスタムドメイン設定                    |
-| Edge Cache    | `cdn.photo.sendo-app.com`     | Cloudflare Workers カスタムドメイン              |
+| Frontend      | `photo.sendo.page`            | Vercel にカスタムドメイン設定                    |
+| Edge Cache    | `cdn.photo.sendo.page`        | Cloudflare Workers カスタムドメイン              |
 | Storage Proxy | `*.workers.dev`（デフォルト）  | カスタムドメイン不要。Cloudflare Access で保護   |
 | Cloud Run     | ドメイン割り当て不要          | Edge Cache Worker からのみアクセス               |
 
@@ -340,9 +340,9 @@ Cloud Run は Edge Cache Worker でバリデーション済みのリクエスト
 Browser
   ↓ Google サインイン
 next-auth (Next.js)
-  ↑ JWT セッショントークン (Cookie: authjs.session-token; Domain=photo.sendo-app.com)
+  ↑ JWT セッショントークン (Cookie: authjs.session-token; Domain=photo.sendo.page)
 Browser
-  ↓ Cookie 付きリクエスト（photo.sendo-app.com および *.photo.sendo-app.com に送信）
+  ↓ Cookie 付きリクエスト（photo.sendo.page および *.photo.sendo.page に送信）
 Edge Cache Worker / Next.js API
   ↓ AUTH_SECRET + AUTH_SALT で JWT 検証
   ↓ ALLOW_EMAILS でメールアドレス照合
@@ -350,7 +350,7 @@ Edge Cache Worker / Next.js API
 
 **Cookie Domain 設定（現行からの変更点）:**
 
-Edge Cache Worker (`cdn.photo.sendo-app.com`) にブラウザから直接リクエストする際、Cookie がサブドメインにも送信される必要がある。next-auth の Cookie 設定で `Domain` 属性を明示的に指定する。
+Edge Cache Worker (`cdn.photo.sendo.page`) にブラウザから直接リクエストする際、Cookie がサブドメインにも送信される必要がある。next-auth の Cookie 設定で `Domain` 属性を明示的に指定する。
 
 ```typescript
 // packages/app/src/auth.ts
@@ -358,7 +358,7 @@ export const { handlers, auth } = NextAuth({
   cookies: {
     sessionToken: {
       options: {
-        domain: ".photo.sendo-app.com", // サブドメインにも Cookie を送信
+        domain: ".photo.sendo.page", // サブドメインにも Cookie を送信
       },
     },
   },
@@ -366,7 +366,7 @@ export const { handlers, auth } = NextAuth({
 });
 ```
 
-- `Domain=.photo.sendo-app.com` を設定すると、`photo.sendo-app.com` および `cdn.photo.sendo-app.com` 等の全サブドメインに Cookie が送信される
+- `Domain=.photo.sendo.page` を設定すると、`photo.sendo.page` および `cdn.photo.sendo.page` 等の全サブドメインに Cookie が送信される
 - 開発環境 (`localhost`) では Domain を設定しない（localhost では Domain 属性不要）
 - **現行 CDN Worker との差異:** 現行の CDN Worker (`family-photo-storage-proxy`) は `Authorization: Bearer` ヘッダでトークンを受け取る方式。フロントエンドの `/api/optimize` が Cookie からトークンを取り出して Bearer ヘッダに変換していた。新しい Edge Cache Worker はブラウザから直接アクセスされるため、Cookie から直接 JWT を読み取る方式に変更する
 
@@ -621,7 +621,7 @@ Cloudflare ダッシュボードで以下を設定する。
 
 | 設定項目                      | 操作場所                                                | 内容                                              |
 | ----------------------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| Edge Cache Worker ドメイン    | Workers & Pages > family-photo-cdn > Settings > Domains | `cdn.photo.sendo-app.com`                               |
+| Edge Cache Worker ドメイン    | Workers & Pages > family-photo-cdn > Settings > Domains | `cdn.photo.sendo.page`                               |
 | Access Application            | Zero Trust > Access > Applications                      | Storage Proxy の workers.dev ドメインに Self-hosted App を作成 |
 | Access Policy                 | 同上 > Policies                                         | Action: Service Auth, Service Token を指定        |
 | Service Token                 | Zero Trust > Access > Service Auth > Service Tokens     | Cloud Run 用の Service Token を発行               |
@@ -679,10 +679,10 @@ Edge Cache Worker は Cloudflare Cache API を使用。リクエスト URL 全�
 **例:**
 
 ```
-https://cdn.photo.sendo-app.com/media/abc123.jpg?w=800&f=webp  → キャッシュキー A（リサイズ+変換）
-https://cdn.photo.sendo-app.com/media/abc123.jpg?w=400&f=webp  → キャッシュキー B（リサイズ+変換）
-https://cdn.photo.sendo-app.com/media/abc123.jpg                → キャッシュキー C（メタデータ削除済み）
-https://cdn.photo.sendo-app.com/media/xyz789.mp4                → キャッシュキー D（動画パススルー）
+https://cdn.photo.sendo.page/media/abc123.jpg?w=800&f=webp  → キャッシュキー A（リサイズ+変換）
+https://cdn.photo.sendo.page/media/abc123.jpg?w=400&f=webp  → キャッシュキー B（リサイズ+変換）
+https://cdn.photo.sendo.page/media/abc123.jpg                → キャッシュキー C（メタデータ削除済み）
+https://cdn.photo.sendo.page/media/xyz789.mp4                → キャッシュキー D（動画パススルー）
 ```
 
 ### 7.2 TTL
@@ -1128,7 +1128,7 @@ Location: https://<team>.cloudflareaccess.com/cdn-cgi/access/login/...
 
 Phase 3 完了後、Edge Cache Worker → Storage Proxy の経路が動作する状態で移行する。
 
-1. next-auth の Cookie 設定に `Domain=.photo.sendo-app.com` を追加（セクション 4.3 参照）
+1. next-auth の Cookie 設定に `Domain=.photo.sendo.page` を追加（セクション 4.3 参照）
 2. `OptimizedImage` コンポーネントの画像 URL を Edge Cache Worker オリジンに変更（パラメータ名: `width` → `w`, `format` → `f`, `quality` → `q`）
 3. `/api/download` を Edge Cache Worker 経由に変更（`?download=true` パラメータ使用、セクション 3.1 参照）
 4. `/api/optimize` API Route の削除
