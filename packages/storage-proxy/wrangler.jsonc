@@ -9,7 +9,7 @@
   },
   "vars": {
     "ALLOW_LIST_BUCKET": false,
-    "APP_HOST": "photo.sendo-app.com",
+    "APP_HOST": "photo.sendo.page",
     "B2_ENDPOINT": "s3.us-west-004.backblazeb2.com",
     "BUCKET_NAME": "family-photo",
     "CF_ACCESS_AUD": "eef2fa7c4b4e43983ce276ef86744064367a6ea37e8acfec82679d8cec1bdc51",
