@@ -22,7 +22,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   cookies: {
     sessionToken: {
       options: {
-        domain: isProduction ? ".photo.sendo-app.com" : undefined,
+        domain: isProduction ? ".photo.sendo.page" : undefined,
       },
     },
   },
