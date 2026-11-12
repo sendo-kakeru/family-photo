@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "hono": "4.13.16",
+    "hono": "4.13.17",
     "jose": "6.2.15"
   },
   "devDependencies": {
