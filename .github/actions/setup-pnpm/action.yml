@@ -12,9 +12,9 @@ runs:
   using: composite
   steps:
     - name: Setup pnpm
-      uses: pnpm/action-setup@v6.1.0
+      uses: pnpm/action-setup@v6.1.1
       with:
-        version: 12.16.1
+        version: 12.18.0
 
     - name: Setup Node.js
       uses: actions/setup-node@v7.1.0

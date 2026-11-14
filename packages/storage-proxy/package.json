@@ -1,11 +1,11 @@
 {
   "dependencies": {
     "aws4fetch": "1.0.20",
-    "hono": "4.13.16",
-    "jose": "6.2.15"
+    "hono": "4.13.17",
+    "jose": "6.2.17"
   },
   "devDependencies": {
-    "wrangler": "4.156.2"
+    "wrangler": "4.159.0"
   },
   "name": "@repo/storage-proxy",
   "scripts": {
