@@ -6,7 +6,7 @@
     "typescript": "7.0.2"
   },
   "engines": {
-    "node": "24.22.2"
+    "node": "26.13.1"
   },
   "name": "family-photo",
   "packageManager": "pnpm@12.18.0",
