@@ -54,8 +54,8 @@ export async function GET(request: NextRequest) {
     const medias = pageItems.map((item) => ({
       key: `${item.Key}`,
       lastModified:
-        item.LastModified?.toISOString() || new Date().toISOString(),
-      size: item.Size || 0,
+        item.LastModified?.toISOString() ?? new Date().toISOString(),
+      size: item.Size ?? 0,
     }));
 
     return NextResponse.json({
